@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { getAuthSession } from "@/lib/session";
 import { getAuthCollections, serializeDoc, userIdFilter } from "@/lib/mongodb";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const ctx = await getAuthSession();
   if (!ctx) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

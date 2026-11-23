@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { useAuth } from "@/components/AuthContext";
 import { SITE_SETTINGS } from "@/lib/site-settings";
 
 interface SessionRow {
@@ -22,41 +23,39 @@ interface SessionRow {
 }
 
 export default function AccountSecurityPage() {
-  const [discordId, setDiscordId] = useState<string | null>(null);
-  const [hasPassword, setHasPassword] = useState(false);
+  const { user, refreshUser } = useAuth();
   const [sessions, setSessions] = useState<SessionRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loadingSessions, setLoadingSessions] = useState(true);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [revokeOthers, setRevokeOthers] = useState(false);
-  const [pwdMsg, setPwdMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [pwdMsg, setPwdMsg] = useState<{
+    type: "ok" | "err";
+    text: string;
+  } | null>(null);
   const [savingPwd, setSavingPwd] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const loadSessions = useCallback(async () => {
+    setLoadingSessions(true);
     try {
-      const [meRes, sessRes] = await Promise.all([
-        fetch("/api/me", { cache: "no-store" }),
-        fetch("/api/account/sessions", { cache: "no-store" }),
-      ]);
-      if (meRes.ok) {
-        const mj = await meRes.json();
-        setDiscordId(mj.user?.discordId || null);
-        setHasPassword(Boolean(mj.user?.hasPassword));
-      }
+      const sessRes = await fetch("/api/account/sessions", {
+        cache: "no-store",
+        credentials: "include",
+      });
       if (sessRes.ok) {
         const sj = await sessRes.json();
         setSessions(sj.sessions || []);
       }
     } finally {
-      setLoading(false);
+      setLoadingSessions(false);
     }
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    loadSessions();
+  }, [loadSessions]);
 
   async function handlePasswordUpdate(e: React.FormEvent) {
     e.preventDefault();
@@ -78,12 +77,49 @@ export default function AccountSecurityPage() {
       setCurrentPassword("");
       setNewPassword("");
       setPwdMsg({ type: "ok", text: "Password updated successfully." });
-      await load();
+      await loadSessions();
     } catch (err) {
       setPwdMsg({
         type: "err",
         text: err instanceof Error ? err.message : "Password update failed.",
       });
+    } finally {
+      setSavingPwd(false);
+    }
+  }
+
+  async function handleSetInitialPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      setPwdMsg({ type: "err", text: "Passwords do not match." });
+      return;
+    }
+    setSavingPwd(true);
+    setPwdMsg(null);
+    try {
+      const res = await fetch("/api/account/set-password", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newPassword }),
+      });
+      const j = await res.json();
+      if (!res.ok) {
+        setPwdMsg({
+          type: "err",
+          text: j.error || "Could not set password.",
+        });
+        return;
+      }
+      setNewPassword("");
+      setConfirmPassword("");
+      setPwdMsg({
+        type: "ok",
+        text: "Password created! You can now sign in with Email + Password too.",
+      });
+      await refreshUser();
+    } catch {
+      setPwdMsg({ type: "err", text: "Network error while setting password." });
     } finally {
       setSavingPwd(false);
     }
@@ -99,14 +135,12 @@ export default function AccountSecurityPage() {
   async function revokeSession(sessionId: string) {
     await fetch(
       `/api/account/sessions?sessionId=${encodeURIComponent(sessionId)}`,
-      { method: "DELETE" }
+      { method: "DELETE", credentials: "include" }
     );
-    await load();
+    await loadSessions();
   }
 
-  if (loading) {
-    return <div className="py-12 text-center text-slate-400">Loading security settings...</div>;
-  }
+  if (!user) return null;
 
   return (
     <div className="space-y-6">
@@ -121,13 +155,13 @@ export default function AccountSecurityPage() {
               </h2>
             </div>
             <p className="text-xs text-slate-400">
-              {discordId
-                ? `Connected to Discord ID ${discordId}. Required for SSE Nexus server detection and Discord SSO login.`
+              {user.discordId
+                ? `Connected to Discord ID ${user.discordId}. Required for SSE Nexus server detection and Discord SSO login.`
                 : "Link your Discord account so SSE Nexus and Tournament portals can recognize your servers."}
             </p>
           </div>
 
-          {discordId ? (
+          {user.discordId ? (
             <span className="inline-flex items-center gap-1.5 self-start rounded-xl bg-emerald-500/15 px-3.5 py-2 text-xs font-semibold text-emerald-300 sm:self-center">
               <CheckCircle2 className="h-4 w-4" />
               Discord Linked
@@ -144,8 +178,8 @@ export default function AccountSecurityPage() {
         </section>
       )}
 
-      {/* Change Password */}
-      {hasPassword && (
+      {/* Password Management (Change Password OR Set Initial Password for Discord-only accounts) */}
+      {user.hasPassword ? (
         <form
           onSubmit={handlePasswordUpdate}
           className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6"
@@ -213,6 +247,73 @@ export default function AccountSecurityPage() {
             {savingPwd ? "Updating..." : "Update Password"}
           </button>
         </form>
+      ) : (
+        <form
+          onSubmit={handleSetInitialPassword}
+          className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6"
+        >
+          <div>
+            <div className="flex items-center gap-2">
+              <KeyRound className="h-4 w-4 text-indigo-400" />
+              <h2 className="text-base font-bold text-white">
+                Add Email &amp; Password Login
+              </h2>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              You signed up via Discord. Set a password if you also want to sign
+              in using <strong>{user.email}</strong>.
+            </p>
+          </div>
+
+          {pwdMsg && (
+            <div
+              className={`rounded-xl border p-3 text-xs ${
+                pwdMsg.type === "ok"
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                  : "border-rose-500/40 bg-rose-500/10 text-rose-300"
+              }`}
+            >
+              {pwdMsg.text}
+            </div>
+          )}
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-300">
+                New Password (min. 8 chars)
+              </label>
+              <input
+                type="password"
+                required
+                minLength={8}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-white"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-300">
+                Confirm Password
+              </label>
+              <input
+                type="password"
+                required
+                minLength={8}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-white"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={savingPwd}
+            className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+          >
+            {savingPwd ? "Saving..." : "Set Password"}
+          </button>
+        </form>
       )}
 
       {/* Active Sessions */}
@@ -237,42 +338,48 @@ export default function AccountSecurityPage() {
           )}
         </div>
 
-        <div className="space-y-2.5">
-          {sessions.map((s) => (
-            <div
-              key={s.id}
-              className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 sm:flex-row sm:items-center"
-            >
-              <div className="min-w-0 space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="truncate text-xs font-semibold text-white">
-                    {s.userAgent.slice(0, 80)}
-                  </span>
-                  {s.isCurrent && (
-                    <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
-                      This Device
+        {loadingSessions ? (
+          <div className="py-6 text-center text-xs text-slate-400">
+            Loading active sessions...
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {sessions.map((s) => (
+              <div
+                key={s.id}
+                className="flex flex-col justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 sm:flex-row sm:items-center"
+              >
+                <div className="min-w-0 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-xs font-semibold text-white">
+                      {s.userAgent.slice(0, 80)}
                     </span>
-                  )}
+                    {s.isCurrent && (
+                      <span className="shrink-0 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">
+                        This Device
+                      </span>
+                    )}
+                  </div>
+                  <div className="font-mono text-[11px] text-slate-500">
+                    IP: {s.ipAddress} · Started{" "}
+                    {s.createdAt ? new Date(s.createdAt).toLocaleString() : "-"}
+                  </div>
                 </div>
-                <div className="font-mono text-[11px] text-slate-500">
-                  IP: {s.ipAddress} · Started{" "}
-                  {s.createdAt ? new Date(s.createdAt).toLocaleString() : "-"}
-                </div>
-              </div>
 
-              {!s.isCurrent && (
-                <button
-                  type="button"
-                  onClick={() => revokeSession(s.id)}
-                  className="inline-flex items-center gap-1 self-start rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-300 hover:bg-rose-500/20 sm:self-center"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Revoke
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
+                {!s.isCurrent && (
+                  <button
+                    type="button"
+                    onClick={() => revokeSession(s.id)}
+                    className="inline-flex items-center gap-1 self-start rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-300 hover:bg-rose-500/20 sm:self-center"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    Revoke
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

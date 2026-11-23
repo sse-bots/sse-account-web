@@ -1,15 +1,18 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Lock, Mail } from "lucide-react";
 import { signIn } from "@/lib/auth-client";
+import { useAuth } from "@/components/AuthContext";
 import { SITE_SETTINGS } from "@/lib/site-settings";
 
 function SignInInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState<"email" | "discord" | null>(null);
@@ -22,9 +25,19 @@ function SignInInner() {
   );
 
   const queryStr = searchParams.toString();
-  const callbackURL = hasOAuthFlow
-    ? `/oauth/consent?${queryStr}`
-    : searchParams.get("next") || "/account";
+  const nextParam = searchParams.get("next");
+  const safeNext =
+    nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//")
+      ? nextParam
+      : "/account";
+  const callbackURL = hasOAuthFlow ? `/oauth/consent?${queryStr}` : safeNext;
+
+  // If already logged in and not completing an OAuth consent flow, jump straight to Account
+  useEffect(() => {
+    if (!authLoading && user && !hasOAuthFlow) {
+      router.replace(safeNext);
+    }
+  }, [authLoading, user, hasOAuthFlow, router, safeNext]);
 
   async function handleEmailSignIn(e: React.FormEvent) {
     e.preventDefault();
@@ -32,17 +45,26 @@ function SignInInner() {
     setError(null);
     try {
       const res = await signIn.email({
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
-        callbackURL,
+        rememberMe: true,
       });
       if (res?.error) {
         setError(res.error.message || "Invalid email or password.");
         setLoading(null);
         return;
       }
-      router.push(callbackURL);
-      router.refresh();
+
+      // Respect Better Auth OAuth Provider redirect if present
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = res?.data as any;
+      if (data?.redirect && data?.url) {
+        window.location.assign(data.url);
+        return;
+      }
+
+      // Full navigation ensures fresh session cookie is sent on the first request
+      window.location.assign(callbackURL);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed.");
       setLoading(null);
@@ -53,16 +75,28 @@ function SignInInner() {
     setLoading("discord");
     setError(null);
     try {
-      await signIn.social({
+      const res = await signIn.social({
         provider: "discord",
         callbackURL,
       });
+      if (res?.error) {
+        setError(res.error.message || "Could not start Discord login.");
+        setLoading(null);
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Could not start Discord login."
       );
       setLoading(null);
     }
+  }
+
+  if (!authLoading && user && !hasOAuthFlow) {
+    return (
+      <div className="py-20 text-center text-sm text-slate-400">
+        Already signed in — opening your account...
+      </div>
+    );
   }
 
   return (
@@ -100,6 +134,7 @@ function SignInInner() {
                 <Mail className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
                 <input
                   type="email"
+                  autoComplete="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -117,6 +152,7 @@ function SignInInner() {
                 <Lock className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
                 <input
                   type="password"
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

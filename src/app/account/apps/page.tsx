@@ -20,7 +20,7 @@ export default function AccountConnectedAppsPage() {
   async function load() {
     setLoading(true);
     try {
-      const res = await fetch("/api/account/consents", { cache: "no-store" });
+      const res = await fetch("/api/account/consents", { cache: "no-store", credentials: "include" });
       if (res.ok) {
         const j = await res.json();
         setConsents(j.consents || []);
@@ -37,7 +37,7 @@ export default function AccountConnectedAppsPage() {
   async function revokeApp(clientId: string) {
     await fetch(
       `/api/account/consents?clientId=${encodeURIComponent(clientId)}`,
-      { method: "DELETE" }
+      { method: "DELETE", credentials: "include" }
     );
     load();
   }

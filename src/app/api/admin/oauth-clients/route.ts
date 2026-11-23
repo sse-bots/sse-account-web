@@ -33,6 +33,9 @@ function hashClientSecret(secret: string): string {
   return crypto.createHash("sha256").update(secret).digest("base64url");
 }
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const ctx = await getAuthSession();
   if (!ctx || !ctx.isAdmin) {

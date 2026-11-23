@@ -8,17 +8,21 @@ import { SITE_SETTINGS } from "./site-settings";
 
 function normalizeOrigin(url?: string | null): string | null {
   const cleaned = (url || "").trim().replace(/\/+$/, "");
-  return cleaned || null;
+  if (!cleaned) return null;
+  if (!/^https?:\/\//i.test(cleaned)) {
+    return `https://${cleaned}`;
+  }
+  return cleaned;
 }
 
 const appUrl =
   normalizeOrigin(process.env.BETTER_AUTH_URL) ||
   normalizeOrigin(process.env.NEXT_PUBLIC_APP_URL) ||
-  (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-    : null) ||
-  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
+  normalizeOrigin(process.env.VERCEL_PROJECT_PRODUCTION_URL) ||
+  normalizeOrigin(process.env.VERCEL_URL) ||
   "http://localhost:3000";
+
+const isHttps = appUrl.startsWith("https://");
 
 const extraTrustedOrigins = (process.env.TRUSTED_ORIGINS || "")
   .split(",")
@@ -31,13 +35,11 @@ const trustedOrigins = Array.from(
       appUrl,
       normalizeOrigin(process.env.BETTER_AUTH_URL),
       normalizeOrigin(process.env.NEXT_PUBLIC_APP_URL),
-      process.env.VERCEL_PROJECT_PRODUCTION_URL
-        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-        : null,
-      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+      normalizeOrigin(process.env.VERCEL_PROJECT_PRODUCTION_URL),
+      normalizeOrigin(process.env.VERCEL_URL),
       ...extraTrustedOrigins,
       ...(process.env.NODE_ENV !== "production"
-        ? ["http://localhost:3000"]
+        ? ["http://localhost:3000", "http://127.0.0.1:3000"]
         : []),
     ].filter((o): o is string => Boolean(o))
   )
@@ -73,11 +75,29 @@ export const auth = betterAuth({
   appName: SITE_SETTINGS.siteName,
   baseURL: appUrl,
   trustedOrigins,
-  secret: process.env.BETTER_AUTH_SECRET || "build-placeholder-secret-change-me",
+  secret:
+    (process.env.BETTER_AUTH_SECRET || "").trim() ||
+    "build-placeholder-secret-change-me",
   disabledPaths: ["/token"],
   database: mongodbAdapter(getDbSync(), {
     client: mongoClient,
   }),
+  session: {
+    expiresIn: 60 * 60 * 24 * 30, // 30 days persistent session
+    updateAge: 60 * 60 * 24, // refresh session expiry every 24h
+    cookieCache: {
+      enabled: false, // always read fresh session from MongoDB — prevents stale UI flicker
+    },
+  },
+  advanced: {
+    useSecureCookies: isHttps,
+    defaultCookieAttributes: {
+      sameSite: "lax",
+      httpOnly: true,
+      secure: isHttps,
+      path: "/",
+    },
+  },
   emailAndPassword: {
     enabled: SITE_SETTINGS.features.enableEmailPassword,
     requireEmailVerification: SITE_SETTINGS.features.requireEmailVerification,
@@ -86,9 +106,6 @@ export const auth = betterAuth({
     maxPasswordLength: 128,
   },
   user: {
-    changeEmail: {
-      enabled: true,
-    },
     additionalFields: {
       username: {
         type: "string",
@@ -115,8 +132,8 @@ export const auth = betterAuth({
   socialProviders: SITE_SETTINGS.features.enableDiscordOAuth
     ? {
         discord: {
-          clientId: process.env.DISCORD_CLIENT_ID || "",
-          clientSecret: process.env.DISCORD_CLIENT_SECRET || "",
+          clientId: (process.env.DISCORD_CLIENT_ID || "").trim(),
+          clientSecret: (process.env.DISCORD_CLIENT_SECRET || "").trim(),
           scope: ["identify", "email", "guilds"],
           mapProfileToUser: (profile) => {
             const avatarUrl = profile.avatar

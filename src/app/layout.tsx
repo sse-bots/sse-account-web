@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { AuthProvider } from "@/components/AuthContext";
 import { AppShell } from "@/components/AppShell";
 import { GlobalNetworkMonitor } from "@/components/GlobalNetworkMonitor";
 import { SITE_SETTINGS } from "@/lib/site-settings";
@@ -23,7 +24,9 @@ export default function RootLayout({
     >
       <body className="min-h-screen bg-[#07090e] text-slate-100 antialiased">
         <GlobalNetworkMonitor />
-        <AppShell>{children}</AppShell>
+        <AuthProvider>
+          <AppShell>{children}</AppShell>
+        </AuthProvider>
       </body>
     </html>
   );

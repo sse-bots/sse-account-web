@@ -1,15 +1,18 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Lock, Mail, User } from "lucide-react";
 import { signIn, signUp } from "@/lib/auth-client";
+import { useAuth } from "@/components/AuthContext";
 import { SITE_SETTINGS } from "@/lib/site-settings";
 
 function SignUpInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -22,9 +25,13 @@ function SignUpInner() {
       searchParams.get("oauth_query")
   );
   const queryStr = searchParams.toString();
-  const callbackURL = hasOAuthFlow
-    ? `/oauth/consent?${queryStr}`
-    : "/account";
+  const callbackURL = hasOAuthFlow ? `/oauth/consent?${queryStr}` : "/account";
+
+  useEffect(() => {
+    if (!authLoading && user && !hasOAuthFlow) {
+      router.replace("/account");
+    }
+  }, [authLoading, user, hasOAuthFlow, router]);
 
   async function handleCreateAccount(e: React.FormEvent) {
     e.preventDefault();
@@ -33,17 +40,23 @@ function SignUpInner() {
     try {
       const res = await signUp.email({
         name: name.trim(),
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         password,
-        callbackURL,
       });
       if (res?.error) {
         setError(res.error.message || "Could not create account.");
         setLoading(null);
         return;
       }
-      router.push(callbackURL);
-      router.refresh();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const data = res?.data as any;
+      if (data?.redirect && data?.url) {
+        window.location.assign(data.url);
+        return;
+      }
+
+      window.location.assign(callbackURL);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed.");
       setLoading(null);
@@ -54,13 +67,25 @@ function SignUpInner() {
     setLoading("discord");
     setError(null);
     try {
-      await signIn.social({ provider: "discord", callbackURL });
+      const res = await signIn.social({ provider: "discord", callbackURL });
+      if (res?.error) {
+        setError(res.error.message || "Could not start Discord signup.");
+        setLoading(null);
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Could not start Discord signup."
       );
       setLoading(null);
     }
+  }
+
+  if (!authLoading && user && !hasOAuthFlow) {
+    return (
+      <div className="py-20 text-center text-sm text-slate-400">
+        Already signed in — opening your account...
+      </div>
+    );
   }
 
   return (
@@ -94,6 +119,7 @@ function SignUpInner() {
               <User className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
               <input
                 required
+                autoComplete="name"
                 minLength={2}
                 maxLength={64}
                 value={name}
@@ -112,6 +138,7 @@ function SignUpInner() {
               <Mail className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
               <input
                 type="email"
+                autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -129,6 +156,7 @@ function SignUpInner() {
               <Lock className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
               <input
                 type="password"
+                autoComplete="new-password"
                 required
                 minLength={8}
                 value={password}
