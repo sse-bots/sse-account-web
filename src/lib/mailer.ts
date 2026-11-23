@@ -1,26 +1,151 @@
 import nodemailer from "nodemailer";
+import { getDb } from "./mongodb";
 import { SITE_SETTINGS } from "./site-settings";
 
-export function isEmailProviderConfigured(): boolean {
-  const hasResend = Boolean((process.env.RESEND_API_KEY || "").trim());
-  const hasSmtp = Boolean(
-    (process.env.SMTP_HOST || "").trim() &&
-      (process.env.SMTP_USER || "").trim() &&
-      (process.env.SMTP_PASS || "").trim()
-  );
-  return hasResend || hasSmtp;
+const CONSUMER_EMAIL_DOMAINS = new Set([
+  "gmail.com",
+  "googlemail.com",
+  "yahoo.com",
+  "outlook.com",
+  "hotmail.com",
+  "live.com",
+  "icloud.com",
+  "proton.me",
+  "protonmail.com",
+]);
+
+function stripWrappingQuotes(val: string): string {
+  return val.trim().replace(/^["']+|["']+$/g, "").trim();
 }
 
-export function getEmailProviderName(): "resend" | "smtp" | "none" {
-  if ((process.env.RESEND_API_KEY || "").trim()) return "resend";
-  if (
-    (process.env.SMTP_HOST || "").trim() &&
-    (process.env.SMTP_USER || "").trim() &&
-    (process.env.SMTP_PASS || "").trim()
-  ) {
-    return "smtp";
+function extractEmailAddress(fromHeader: string): string {
+  const match = fromHeader.match(/<([^>]+)>/);
+  return (match ? match[1] : fromHeader).trim().toLowerCase();
+}
+
+function resolveResendFromAddress(): string {
+  const raw = stripWrappingQuotes(process.env.EMAIL_FROM || "");
+  if (!raw) {
+    return `${SITE_SETTINGS.siteName} <onboarding@resend.dev>`;
   }
+  const addr = extractEmailAddress(raw);
+  const domain = addr.split("@")[1] || "";
+  // Resend rejects consumer domains like @gmail.com in `from` — fall back cleanly to onboarding@resend.dev
+  if (!domain || CONSUMER_EMAIL_DOMAINS.has(domain)) {
+    return `${SITE_SETTINGS.siteName} <onboarding@resend.dev>`;
+  }
+  return raw;
+}
+
+function resolveSmtpFromAddress(): string {
+  const raw = stripWrappingQuotes(process.env.EMAIL_FROM || "");
+  const smtpUser = stripWrappingQuotes(process.env.SMTP_USER || "");
+  if (raw && !raw.toLowerCase().includes("onboarding@resend.dev")) {
+    return raw;
+  }
+  if (smtpUser) {
+    return `${SITE_SETTINGS.siteName} <${smtpUser}>`;
+  }
+  return `${SITE_SETTINGS.siteName} <no-reply@sse-world.local>`;
+}
+
+export function isResendConfigured(): boolean {
+  return Boolean(stripWrappingQuotes(process.env.RESEND_API_KEY || ""));
+}
+
+export function isSmtpConfigured(): boolean {
+  return Boolean(
+    stripWrappingQuotes(process.env.SMTP_HOST || "") &&
+      stripWrappingQuotes(process.env.SMTP_USER || "") &&
+      stripWrappingQuotes(process.env.SMTP_PASS || "")
+  );
+}
+
+export function isEmailProviderConfigured(): boolean {
+  return isResendConfigured() || isSmtpConfigured();
+}
+
+export function getEmailProviderName(): "resend+smtp" | "resend" | "smtp" | "none" {
+  const r = isResendConfigured();
+  const s = isSmtpConfigured();
+  if (r && s) return "resend+smtp";
+  if (r) return "resend";
+  if (s) return "smtp";
   return "none";
+}
+
+export interface EmailDeliveryStatus {
+  ok: boolean;
+  provider: "resend" | "smtp" | "none";
+  to: string;
+  purpose: string;
+  messageId: string | null;
+  error: string | null;
+  hint: string | null;
+  updatedAt: string;
+}
+
+async function saveDeliveryStatus(status: Omit<EmailDeliveryStatus, "updatedAt">) {
+  try {
+    const db = await getDb();
+    await db.collection("email_delivery_status").updateOne(
+      { to: status.to.toLowerCase() },
+      {
+        $set: {
+          ...status,
+          to: status.to.toLowerCase(),
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true }
+    );
+  } catch {
+    // Non-fatal diagnostic store
+  }
+}
+
+export async function getLastDeliveryStatus(
+  email: string
+): Promise<EmailDeliveryStatus | null> {
+  try {
+    const db = await getDb();
+    const doc = await db
+      .collection("email_delivery_status")
+      .findOne({ to: email.trim().toLowerCase() });
+    if (!doc) return null;
+    return {
+      ok: Boolean(doc.ok),
+      provider: (doc.provider as EmailDeliveryStatus["provider"]) || "none",
+      to: String(doc.to || email),
+      purpose: String(doc.purpose || ""),
+      messageId: typeof doc.messageId === "string" ? doc.messageId : null,
+      error: typeof doc.error === "string" ? doc.error : null,
+      hint: typeof doc.hint === "string" ? doc.hint : null,
+      updatedAt: doc.updatedAt
+        ? new Date(doc.updatedAt as string | Date).toISOString()
+        : new Date().toISOString(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function buildFriendlyResendHint(status: number, rawMessage: string): string {
+  const lower = rawMessage.toLowerCase();
+  if (
+    lower.includes("testing emails") ||
+    lower.includes("verify a domain") ||
+    lower.includes("own email address")
+  ) {
+    return "Resend's free onboarding@resend.dev sender can ONLY deliver to the email address that owns your Resend account. Verify a custom domain in Resend (resend.com/domains), OR add Gmail SMTP (SMTP_HOST, SMTP_USER, SMTP_PASS) in Vercel to send to any user email for free.";
+  }
+  if (status === 401 || lower.includes("api key")) {
+    return "Check your RESEND_API_KEY in Vercel Environment Variables — Resend rejected the key.";
+  }
+  if (lower.includes("from")) {
+    return "Your EMAIL_FROM address must use a domain verified in Resend (or leave it as onboarding@resend.dev for owner-only testing).";
+  }
+  return "Check Vercel Logs or your Resend Dashboard → Logs for full details.";
 }
 
 function buildOtpHtml(opts: {
@@ -58,17 +183,43 @@ function buildOtpHtml(opts: {
 </html>`.trim();
 }
 
+async function sendViaSmtp(params: {
+  to: string;
+  subject: string;
+  text: string;
+  html: string;
+}): Promise<string | null> {
+  const smtpHost = stripWrappingQuotes(process.env.SMTP_HOST || "");
+  const smtpUser = stripWrappingQuotes(process.env.SMTP_USER || "");
+  const smtpPass = stripWrappingQuotes(process.env.SMTP_PASS || "");
+  const port = Number(process.env.SMTP_PORT || 465);
+  const secure =
+    process.env.SMTP_SECURE !== undefined
+      ? process.env.SMTP_SECURE === "true"
+      : port === 465;
+
+  const transporter = nodemailer.createTransport({
+    host: smtpHost,
+    port,
+    secure,
+    auth: { user: smtpUser, pass: smtpPass },
+  });
+
+  const info = await transporter.sendMail({
+    from: resolveSmtpFromAddress(),
+    to: params.to,
+    subject: params.subject,
+    text: params.text,
+    html: params.html,
+  });
+  return info.messageId || null;
+}
+
 export async function sendOtpEmail(params: {
   to: string;
   otp: string;
   purpose: "2fa" | "sign-in" | "email-verification" | "forget-password";
 }): Promise<void> {
-  const from =
-    (process.env.EMAIL_FROM || "").trim() ||
-    (process.env.SMTP_USER
-      ? `${SITE_SETTINGS.siteName} <${process.env.SMTP_USER.trim()}>`
-      : `${SITE_SETTINGS.siteName} <onboarding@resend.dev>`);
-
   const copyMap = {
     "2fa": {
       subject: `${params.otp} is your ${SITE_SETTINGS.siteName} 2-Step verification code`,
@@ -104,8 +255,11 @@ export async function sendOtpEmail(params: {
   });
   const text = `${copyMap.heading}\n\nYour code: ${params.otp}\nExpires in ${copyMap.expiresMinutes} minutes.\n\n${SITE_SETTINGS.siteName}`;
 
-  const resendKey = (process.env.RESEND_API_KEY || "").trim();
+  const resendKey = stripWrappingQuotes(process.env.RESEND_API_KEY || "");
+  let resendError: { message: string; hint: string } | null = null;
+
   if (resendKey) {
+    const from = resolveResendFromAddress();
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
@@ -120,43 +274,97 @@ export async function sendOtpEmail(params: {
         text,
       }),
     });
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`Resend email delivery failed (${res.status}): ${errText}`);
+
+    if (res.ok) {
+      const json = (await res.json().catch(() => ({}))) as { id?: string };
+      await saveDeliveryStatus({
+        ok: true,
+        provider: "resend",
+        to: params.to,
+        purpose: params.purpose,
+        messageId: json.id || null,
+        error: null,
+        hint: null,
+      });
+      return;
     }
-    return;
+
+    const rawBody = await res.text().catch(() => "");
+    let parsedMsg = rawBody;
+    try {
+      const parsed = JSON.parse(rawBody) as { message?: string; name?: string };
+      if (parsed.message) parsedMsg = parsed.message;
+    } catch {
+      // keep raw text
+    }
+
+    const hint = buildFriendlyResendHint(res.status, parsedMsg);
+    resendError = {
+      message: `Resend (${res.status}): ${parsedMsg || "Delivery failed"}`,
+      hint,
+    };
+    console.error(`[Mailer] ${resendError.message} | to=${params.to} | from=${from}`);
   }
 
-  const smtpHost = (process.env.SMTP_HOST || "").trim();
-  const smtpUser = (process.env.SMTP_USER || "").trim();
-  const smtpPass = (process.env.SMTP_PASS || "").trim();
+  // Automatic SMTP fallback (works if SMTP is primary OR if Resend sandbox blocked a recipient!)
+  if (isSmtpConfigured()) {
+    try {
+      const messageId = await sendViaSmtp({
+        to: params.to,
+        subject: copyMap.subject,
+        text,
+        html,
+      });
+      await saveDeliveryStatus({
+        ok: true,
+        provider: "smtp",
+        to: params.to,
+        purpose: params.purpose,
+        messageId,
+        error: null,
+        hint: null,
+      });
+      return;
+    } catch (err) {
+      const smtpMsg =
+        err instanceof Error ? err.message : "SMTP email delivery failed.";
+      console.error(`[Mailer] SMTP error for ${params.to}:`, smtpMsg);
+      await saveDeliveryStatus({
+        ok: false,
+        provider: "smtp",
+        to: params.to,
+        purpose: params.purpose,
+        messageId: null,
+        error: `SMTP Error: ${smtpMsg}`,
+        hint: "Verify SMTP_HOST, SMTP_PORT (465), SMTP_USER, and your 16-character Gmail App Password.",
+      });
+      throw new Error(`SMTP Error: ${smtpMsg}`);
+    }
+  }
 
-  if (smtpHost && smtpUser && smtpPass) {
-    const port = Number(process.env.SMTP_PORT || 465);
-    const secure =
-      process.env.SMTP_SECURE !== undefined
-        ? process.env.SMTP_SECURE === "true"
-        : port === 465;
-
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port,
-      secure,
-      auth: { user: smtpUser, pass: smtpPass },
-    });
-
-    await transporter.sendMail({
-      from,
+  if (resendError) {
+    await saveDeliveryStatus({
+      ok: false,
+      provider: "resend",
       to: params.to,
-      subject: copyMap.subject,
-      text,
-      html,
+      purpose: params.purpose,
+      messageId: null,
+      error: resendError.message,
+      hint: resendError.hint,
     });
-    return;
+    throw new Error(resendError.message);
   }
 
-  // Fallback for unconfigured environments: throw a clear actionable error
-  throw new Error(
-    "Email delivery is not configured yet. Add RESEND_API_KEY or SMTP_HOST/SMTP_USER/SMTP_PASS in Vercel Environment Variables."
-  );
+  const unconfigured =
+    "Email delivery is not configured yet. Add RESEND_API_KEY or SMTP_HOST/SMTP_USER/SMTP_PASS in Vercel Environment Variables.";
+  await saveDeliveryStatus({
+    ok: false,
+    provider: "none",
+    to: params.to,
+    purpose: params.purpose,
+    messageId: null,
+    error: unconfigured,
+    hint: "Configure Resend (with a verified domain) or Gmail SMTP in Vercel.",
+  });
+  throw new Error(unconfigured);
 }

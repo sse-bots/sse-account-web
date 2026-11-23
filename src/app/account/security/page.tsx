@@ -169,6 +169,7 @@ function SecurityPageInner() {
     if (!user) return;
     setVerifyBusy(true);
     setVerifyMsg(null);
+    const startedAt = Date.now() - 2000;
     try {
       const res = await authClient.emailOtp.sendVerificationOtp({
         email: user.email,
@@ -183,10 +184,30 @@ function SecurityPageInner() {
         });
         return;
       }
+
+      // Better Auth's emailOTP catches provider errors silently; check real server delivery status
+      const statusRes = await fetch("/api/account/email-status", {
+        cache: "no-store",
+        credentials: "include",
+      }).catch(() => null);
+      if (statusRes?.ok) {
+        const sj = await statusRes.json().catch(() => null);
+        const st = sj?.status;
+        const stTime = st?.updatedAt ? new Date(st.updatedAt).getTime() : 0;
+        if (st && stTime >= startedAt && !st.ok) {
+          setVerifySent(false);
+          setVerifyMsg({
+            type: "err",
+            text: st.hint ? `${st.error} — ${st.hint}` : st.error || "Email delivery failed.",
+          });
+          return;
+        }
+      }
+
       setVerifySent(true);
       setVerifyMsg({
         type: "ok",
-        text: `Sent a 6-digit verification code to ${user.email}.`,
+        text: `Sent a 6-digit verification code to ${user.email}. Check your inbox or spam folder.`,
       });
     } catch (err) {
       setVerifyMsg({
@@ -543,7 +564,7 @@ function SecurityPageInner() {
       )}
 
       {/* Email Verification Card (unlocks Verified Email badge) */}
-      <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
+      <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4 sm:p-6">
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500/15 text-sky-400">
@@ -568,7 +589,7 @@ function SecurityPageInner() {
                   </span>
                 )}
               </div>
-              <p className="mt-0.5 text-xs text-slate-400">
+              <p className="mt-0.5 break-words text-xs text-slate-400">
                 {user.emailVerified
                   ? `Primary email ${user.email} is verified.`
                   : `Verify ${user.email} with a 6-digit code to boost your security score and unlock the Verified Email badge.`}
@@ -606,7 +627,7 @@ function SecurityPageInner() {
         )}
 
         {verifySent && !user.emailVerified && (
-          <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+          <div className="space-y-4 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70 px-3 py-4 sm:p-5">
             <OtpCodeInput
               value={verifyOtp}
               onChange={setVerifyOtp}
@@ -683,7 +704,7 @@ function SecurityPageInner() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs text-slate-400">
+                    <p className="mt-0.5 break-words text-xs text-slate-400">
                       {isDiscordLinked
                         ? `${user.discordUsername ? `@${user.discordUsername} · ` : ""}ID: ${user.discordId}`
                         : "Required for SSE Nexus server detection, bot activation, and Discord SSO login."}
@@ -755,7 +776,7 @@ function SecurityPageInner() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-0.5 text-xs text-slate-400">
+                    <p className="mt-0.5 break-words text-xs text-slate-400">
                       {isGitHubLinked
                         ? `${user.githubUsername ? `@${user.githubUsername} · ` : ""}ID: ${user.githubId}`
                         : "Connect your GitHub account to unlock the GitHub Developer badge and one-click login."}
