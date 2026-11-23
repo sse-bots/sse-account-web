@@ -6,10 +6,42 @@ import { oauthProvider } from "@better-auth/oauth-provider";
 import { mongoClient, getDbSync } from "./mongodb";
 import { SITE_SETTINGS } from "./site-settings";
 
+function normalizeOrigin(url?: string | null): string | null {
+  const cleaned = (url || "").trim().replace(/\/+$/, "");
+  return cleaned || null;
+}
+
 const appUrl =
-  process.env.BETTER_AUTH_URL ||
-  process.env.NEXT_PUBLIC_APP_URL ||
+  normalizeOrigin(process.env.BETTER_AUTH_URL) ||
+  normalizeOrigin(process.env.NEXT_PUBLIC_APP_URL) ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : null) ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null) ||
   "http://localhost:3000";
+
+const extraTrustedOrigins = (process.env.TRUSTED_ORIGINS || "")
+  .split(",")
+  .map((o) => normalizeOrigin(o))
+  .filter((o): o is string => Boolean(o));
+
+const trustedOrigins = Array.from(
+  new Set(
+    [
+      appUrl,
+      normalizeOrigin(process.env.BETTER_AUTH_URL),
+      normalizeOrigin(process.env.NEXT_PUBLIC_APP_URL),
+      process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : null,
+      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null,
+      ...extraTrustedOrigins,
+      ...(process.env.NODE_ENV !== "production"
+        ? ["http://localhost:3000"]
+        : []),
+    ].filter((o): o is string => Boolean(o))
+  )
+);
 
 const ownerDiscordId = (
   process.env.OWNER_DISCORD_ID ||
@@ -40,6 +72,7 @@ export function resolveSseRole(
 export const auth = betterAuth({
   appName: SITE_SETTINGS.siteName,
   baseURL: appUrl,
+  trustedOrigins,
   secret: process.env.BETTER_AUTH_SECRET || "build-placeholder-secret-change-me",
   disabledPaths: ["/token"],
   database: mongodbAdapter(getDbSync(), {
