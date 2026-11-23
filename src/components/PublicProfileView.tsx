@@ -63,8 +63,8 @@ export function PublicProfileView({
       {/* Main Hero Identity Card */}
       <section className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/70 shadow-2xl">
         {/* Adaptive Cover Banner */}
-        <div className="relative h-32 bg-gradient-to-br from-slate-900 via-[#101525] to-indigo-950/60 sm:h-40">
-          <div className="absolute right-4 top-4 flex items-center gap-2">
+        <div className="sse-profile-banner relative z-0 h-28 border-b border-slate-800/80 sm:h-36">
+          <div className="absolute right-3.5 top-3.5 z-10 flex items-center gap-2 sm:right-5 sm:top-4">
             <CopyButton value={profileUrl} label="Share Profile" />
             {isOwnProfile && (
               <Link
@@ -78,36 +78,63 @@ export function PublicProfileView({
           </div>
         </div>
 
-        <div className="px-6 pb-7">
-          {/* Avatar + Name + Pinned Badges */}
-          <div className="-mt-12 flex flex-col justify-between gap-4 sm:-mt-14 sm:flex-row sm:items-end">
-            <div className="flex items-end gap-4">
-              {profile.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={profile.image}
-                  alt={profile.name}
-                  className="h-24 w-24 rounded-3xl border-4 border-[#0c0f17] object-cover shadow-2xl sm:h-28 sm:w-28"
-                />
-              ) : (
-                <div className="flex h-24 w-24 items-center justify-center rounded-3xl border-4 border-[#0c0f17] bg-indigo-600 text-3xl font-extrabold text-white shadow-2xl sm:h-28 sm:w-28">
-                  <User className="h-11 w-11" />
-                </div>
-              )}
+        {/* Profile Body (explicit z-10 so avatar cleanly overlaps banner without clipping!) */}
+        <div className="relative z-10 px-5 pb-6 sm:px-6 sm:pb-7">
+          {/* Avatar + Desktop Roles Row */}
+          <div className="-mt-12 flex items-end justify-between gap-4 sm:-mt-14">
+            {profile.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={profile.image}
+                alt={profile.name}
+                className="h-24 w-24 shrink-0 rounded-3xl border-4 border-[#0c0f17] bg-slate-900 object-cover shadow-xl sm:h-28 sm:w-28"
+              />
+            ) : (
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-3xl border-4 border-[#0c0f17] bg-indigo-600 text-3xl font-extrabold text-white shadow-xl sm:h-28 sm:w-28">
+                <User className="h-11 w-11" />
+              </div>
+            )}
 
-              <div className="pb-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-                    {profile.name}
-                  </h1>
-                  {profile.emailVerified && (
-                    <span
-                      title="Verified SSE Account"
-                      className="inline-flex items-center text-sky-400"
-                    >
-                      <BadgeCheck className="h-5 w-5" />
-                    </span>
-                  )}
+            {/* Roles & 2FA Pill (Desktop top-right below banner) */}
+            <div className="hidden flex-wrap items-center justify-end gap-2 pb-1 sm:flex">
+              {profile.twoFactorEnabled && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-300">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  2FA Verified
+                </span>
+              )}
+              {profile.roleDetails.map((r) => (
+                <span
+                  key={r.slug}
+                  className="rounded-full px-3 py-1 text-xs font-bold"
+                  style={{
+                    backgroundColor: `${r.color}22`,
+                    color: r.color,
+                    border: `1px solid ${r.color}55`,
+                  }}
+                >
+                  {r.name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Name, Verified Check, Pinned Badges & Handle — cleanly BELOW banner */}
+          <div className="mt-3.5 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="break-words text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
+                {profile.name}
+              </h1>
+              {profile.emailVerified && (
+                <span
+                  title="Verified SSE Account"
+                  className="inline-flex items-center text-sky-400"
+                >
+                  <BadgeCheck className="h-5 w-5" />
+                </span>
+              )}
+              {topBadges.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
                   {topBadges.map((b) => (
                     <span
                       key={b.slug}
@@ -123,23 +150,23 @@ export function PublicProfileView({
                     </span>
                   ))}
                 </div>
-
-                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
-                  <span className="font-mono font-semibold text-indigo-400">
-                    @{profile.username}
-                  </span>
-                  {joinedLabel && (
-                    <span className="inline-flex items-center gap-1">
-                      <Calendar className="h-3.5 w-3.5" />
-                      Joined {joinedLabel}
-                    </span>
-                  )}
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Roles & 2FA Pill */}
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
+              <span className="font-mono font-semibold text-indigo-400">
+                @{profile.username}
+              </span>
+              {joinedLabel && (
+                <span className="inline-flex items-center gap-1">
+                  <Calendar className="h-3.5 w-3.5" />
+                  Joined {joinedLabel}
+                </span>
+              )}
+            </div>
+
+            {/* Mobile Roles & 2FA Pill */}
+            <div className="mt-3 flex flex-wrap items-center gap-2 sm:hidden">
               {profile.twoFactorEnabled && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-300">
                   <ShieldCheck className="h-3.5 w-3.5" />
@@ -239,7 +266,7 @@ export function PublicProfileView({
       </section>
 
       {/* Badges Trophy Case */}
-      <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
+      <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-5 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Award className="h-5 w-5 text-indigo-400" />
