@@ -42,7 +42,9 @@ function extractSecretFromUri(uri: string): string {
 }
 
 function useTotpCountdown(): number {
-  const [secs, setSecs] = useState(() => 30 - (Math.floor(Date.now() / 1000) % 30));
+  const [secs, setSecs] = useState(
+    () => 30 - (Math.floor(Date.now() / 1000) % 30)
+  );
   useEffect(() => {
     const timer = window.setInterval(() => {
       setSecs(30 - (Math.floor(Date.now() / 1000) % 30));
@@ -61,7 +63,7 @@ export function TwoFactorWizard({
 }: TwoFactorWizardProps) {
   const secondsLeft = useTotpCountdown();
 
-  // Wizard state: idle -> password -> qr -> verify -> backups
+  // Wizard state: idle -> password -> scan -> backups
   const [wizardOpen, setWizardOpen] = useState(false);
   const [step, setStep] = useState<"password" | "scan" | "backups">("password");
   const [password, setPassword] = useState("");
@@ -72,14 +74,17 @@ export function TwoFactorWizard({
   const [otpCode, setOtpCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [banner, setBanner] = useState<{ type: "ok" | "err"; text: string } | null>(
-    null
-  );
+  const [banner, setBanner] = useState<{
+    type: "ok" | "err";
+    text: string;
+  } | null>(null);
 
   // Management modals (Regenerate backup codes / Disable 2FA)
   const [modalMode, setModalMode] = useState<"regen" | "disable" | null>(null);
   const [modalPassword, setModalPassword] = useState("");
-  const [regeneratedCodes, setRegeneratedCodes] = useState<string[] | null>(null);
+  const [regeneratedCodes, setRegeneratedCodes] = useState<string[] | null>(
+    null
+  );
 
   useEffect(() => {
     if (!totpUri) {
@@ -116,6 +121,7 @@ export function TwoFactorWizard({
     try {
       const res = await authClient.twoFactor.enable({
         password,
+        method: "totp",
         issuer: SITE_SETTINGS.siteName,
       });
       if (res?.error) {
@@ -123,7 +129,7 @@ export function TwoFactorWizard({
         return;
       }
       const data = res?.data;
-      if (!data?.totpURI) {
+      if (!data || data.method !== "totp" || !data.totpURI) {
         setError("Server did not return an authenticator setup URI.");
         return;
       }
@@ -132,7 +138,9 @@ export function TwoFactorWizard({
       setBackupCodes(Array.isArray(data.backupCodes) ? data.backupCodes : []);
       setStep("scan");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not start 2FA setup.");
+      setError(
+        err instanceof Error ? err.message : "Could not start 2FA setup."
+      );
     } finally {
       setBusy(false);
     }
@@ -153,7 +161,8 @@ export function TwoFactorWizard({
       });
       if (res?.error) {
         setError(
-          res.error.message || "Invalid 6-digit code. Wait for the next code and try again."
+          res.error.message ||
+            "Invalid 6-digit code. Wait for the next code and try again."
         );
         setOtpCode("");
         return;
@@ -617,7 +626,10 @@ export function TwoFactorWizard({
 
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap gap-2">
-                  <CopyButton value={backupCodes.join("\n")} label="Copy All Codes" />
+                  <CopyButton
+                    value={backupCodes.join("\n")}
+                    label="Copy All Codes"
+                  />
                   <button
                     type="button"
                     onClick={() => downloadBackupCodes(backupCodes)}
