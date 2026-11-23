@@ -27,7 +27,6 @@ function createClient(): MongoClient {
   return client;
 }
 
-// Always cache on globalThis in BOTH development and Vercel production lambdas
 export const mongoClient: MongoClient =
   globalThis._sseAccountsMongoClient ??
   (globalThis._sseAccountsMongoClient = createClient());
@@ -40,7 +39,6 @@ export async function getMongoClient(): Promise<MongoClient> {
     globalThis._sseAccountsMongoConnectPromise = mongoClient
       .connect()
       .catch((err) => {
-        // Clear rejected promise so next request can recover automatically
         globalThis._sseAccountsMongoConnectPromise = undefined;
         throw err;
       });
@@ -57,10 +55,29 @@ export async function getDb(): Promise<Db> {
   return client.db(dbName);
 }
 
-export function userIdFilter(userId: string): { $in: Array<string | ObjectId> } {
-  const values: Array<string | ObjectId> = [userId];
-  if (ObjectId.isValid(userId)) {
-    values.push(new ObjectId(userId));
+export function userIdFilter(
+  ...rawIds: Array<string | ObjectId | null | undefined>
+): { $in: Array<string | ObjectId> } {
+  const seen = new Set<string>();
+  const values: Array<string | ObjectId> = [];
+
+  for (const raw of rawIds) {
+    if (!raw) continue;
+    const str =
+      typeof raw === "string"
+        ? raw.trim()
+        : typeof raw.toHexString === "function"
+          ? raw.toHexString()
+          : String(raw);
+    if (!str) continue;
+    if (!seen.has(`s:${str}`)) {
+      seen.add(`s:${str}`);
+      values.push(str);
+    }
+    if (ObjectId.isValid(str) && !seen.has(`o:${str}`)) {
+      seen.add(`o:${str}`);
+      values.push(new ObjectId(str));
+    }
   }
   return { $in: values };
 }
@@ -78,9 +95,37 @@ export async function getAuthCollections() {
     users: db.collection<Document>("user"),
     accounts: db.collection<Document>("account"),
     sessions: db.collection<Document>("session"),
+    twoFactors: db.collection<Document>("twoFactor"),
     oauthClients: db.collection<Document>("oauthClient"),
     oauthConsents: db.collection<Document>("oauthConsent"),
+    oauthAccessTokens: db.collection<Document>("oauthAccessToken"),
+    oauthRefreshTokens: db.collection<Document>("oauthRefreshToken"),
+    roles: db.collection<Document>("roles"),
+    badges: db.collection<Document>("badges"),
+    securityLogs: db.collection<Document>("security_logs"),
   };
+}
+
+export async function logSecurityEvent(event: {
+  userId: string;
+  action: string;
+  title: string;
+  detail?: string;
+  status?: "info" | "success" | "warning";
+}): Promise<void> {
+  try {
+    const { securityLogs } = await getAuthCollections();
+    await securityLogs.insertOne({
+      userId: event.userId,
+      action: event.action,
+      title: event.title,
+      detail: event.detail || "",
+      status: event.status || "info",
+      createdAt: new Date(),
+    });
+  } catch {
+    // non-fatal telemetry
+  }
 }
 
 export function serializeDoc<T extends Record<string, unknown>>(doc: T): T {

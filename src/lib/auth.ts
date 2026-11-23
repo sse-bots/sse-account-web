@@ -1,10 +1,20 @@
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "@better-auth/mongo-adapter";
-import { jwt } from "better-auth/plugins";
+import { emailOTP, jwt, twoFactor } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import { oauthProvider } from "@better-auth/oauth-provider";
-import { mongoClient, getDbSync, userDocMatch } from "./mongodb";
+import type { Document, Filter } from "mongodb";
+import {
+  mongoClient,
+  getDbSync,
+  userDocMatch,
+  getAuthCollections,
+  logSecurityEvent,
+} from "./mongodb";
 import { SITE_SETTINGS } from "./site-settings";
+import { isEnvAdminMatch, resolveUserRolesAndPermissions } from "./roles";
+import { resolveUserBadges } from "./badges";
+import { sendOtpEmail } from "./mailer";
 
 function normalizeOrigin(url?: string | null): string | null {
   const cleaned = (url || "").trim().replace(/\/+$/, "");
@@ -45,30 +55,11 @@ const trustedOrigins = Array.from(
   )
 );
 
-const ownerDiscordId = (
-  process.env.OWNER_DISCORD_ID ||
-  process.env.HUB_OWNER_ID ||
-  ""
-).trim();
-
-const adminEmailSet = new Set(
-  (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((e) => e.trim().toLowerCase())
-    .filter(Boolean)
-);
-
 export function resolveSseRole(
   discordId: string | null | undefined,
   email: string | null | undefined
-): "owner" | "admin" | "user" {
-  if (ownerDiscordId && discordId && discordId === ownerDiscordId) {
-    return "owner";
-  }
-  if (email && adminEmailSet.has(email.trim().toLowerCase())) {
-    return "admin";
-  }
-  return "user";
+): "admin" | "member" {
+  return isEnvAdminMatch(discordId, email) ? "admin" : "member";
 }
 
 export function getConfiguredSocialProviders() {
@@ -81,6 +72,78 @@ export function getConfiguredSocialProviders() {
       SITE_SETTINGS.features.enableGitHubOAuth &&
       Boolean((process.env.GITHUB_CLIENT_ID || "").trim()) &&
       Boolean((process.env.GITHUB_CLIENT_SECRET || "").trim()),
+  };
+}
+
+async function resolveOidcClaims(user: Record<string, unknown>) {
+  const userId = String(user.id || "");
+  let discordId = typeof user.discordId === "string" ? user.discordId : null;
+  let discordUsername =
+    typeof user.discordUsername === "string" ? user.discordUsername : null;
+  let githubId = typeof user.githubId === "string" ? user.githubId : null;
+  let githubUsername =
+    typeof user.githubUsername === "string" ? user.githubUsername : null;
+  let username = typeof user.username === "string" ? user.username : null;
+  let email = typeof user.email === "string" ? user.email : null;
+  let emailVerified = Boolean(user.emailVerified);
+  let twoFactorEnabled = Boolean(user.twoFactorEnabled);
+  let storedRoles: unknown = user.roles;
+  let storedBadges: unknown = user.badges;
+  let pinnedBadges: unknown = user.pinnedBadges;
+
+  if (userId) {
+    try {
+      const { users } = await getAuthCollections();
+      const freshDoc = await users.findOne(
+        userDocMatch(userId) as unknown as Filter<Document>
+      );
+      if (freshDoc) {
+        if (typeof freshDoc.discordId === "string") discordId = freshDoc.discordId;
+        if (typeof freshDoc.discordUsername === "string")
+          discordUsername = freshDoc.discordUsername;
+        if (typeof freshDoc.githubId === "string") githubId = freshDoc.githubId;
+        if (typeof freshDoc.githubUsername === "string")
+          githubUsername = freshDoc.githubUsername;
+        if (typeof freshDoc.username === "string") username = freshDoc.username;
+        if (typeof freshDoc.email === "string") email = freshDoc.email;
+        emailVerified = Boolean(freshDoc.emailVerified);
+        twoFactorEnabled = Boolean(freshDoc.twoFactorEnabled);
+        storedRoles = freshDoc.roles;
+        storedBadges = freshDoc.badges;
+        pinnedBadges = freshDoc.pinnedBadges;
+      }
+    } catch {
+      // fall back to session fields
+    }
+  }
+
+  const roleState = await resolveUserRolesAndPermissions({
+    storedRoles,
+    discordId,
+    email,
+  });
+
+  const badgeState = await resolveUserBadges({
+    storedBadges,
+    pinnedBadges,
+    twoFactorEnabled,
+    emailVerified,
+    discordLinked: Boolean(discordId),
+    githubLinked: Boolean(githubId),
+    isAdmin: roleState.isAdmin,
+  });
+
+  return {
+    username,
+    discord_id: discordId,
+    discord_username: discordUsername,
+    github_id: githubId,
+    github_username: githubUsername,
+    sse_role: roleState.primaryRole,
+    sse_roles: roleState.roles,
+    sse_permissions: roleState.permissions,
+    sse_badges: badgeState.badgeSlugs,
+    two_factor_enabled: twoFactorEnabled,
   };
 }
 
@@ -147,8 +210,8 @@ export const auth = betterAuth({
     client: mongoClient,
   }),
   session: {
-    expiresIn: 60 * 60 * 24 * 30, // 30 days persistent session
-    updateAge: 60 * 60 * 24, // refresh expiry every 24h
+    expiresIn: 60 * 60 * 24 * 30,
+    updateAge: 60 * 60 * 24,
     cookieCache: {
       enabled: false,
     },
@@ -171,36 +234,12 @@ export const auth = betterAuth({
   },
   user: {
     additionalFields: {
-      username: {
-        type: "string",
-        required: false,
-        input: true,
-      },
-      bio: {
-        type: "string",
-        required: false,
-        input: true,
-      },
-      discordId: {
-        type: "string",
-        required: false,
-        input: false,
-      },
-      discordUsername: {
-        type: "string",
-        required: false,
-        input: false,
-      },
-      githubId: {
-        type: "string",
-        required: false,
-        input: false,
-      },
-      githubUsername: {
-        type: "string",
-        required: false,
-        input: false,
-      },
+      username: { type: "string", required: false, input: true },
+      bio: { type: "string", required: false, input: true },
+      discordId: { type: "string", required: false, input: false },
+      discordUsername: { type: "string", required: false, input: false },
+      githubId: { type: "string", required: false, input: false },
+      githubUsername: { type: "string", required: false, input: false },
     },
   },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -215,6 +254,27 @@ export const auth = betterAuth({
     },
   },
   databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          if (!user?.id) return;
+          const db = getDbSync();
+          const users = db.collection("user");
+          await users
+            .updateOne(userDocMatch(String(user.id)) as never, {
+              $setOnInsert: { roles: ["member"], badges: [], pinnedBadges: [] },
+            })
+            .catch(() => {});
+          await logSecurityEvent({
+            userId: String(user.id),
+            action: "account_created",
+            title: "SSE Account Created",
+            detail: `Registered with ${user.email}`,
+            status: "success",
+          });
+        },
+      },
+    },
     account: {
       create: {
         after: async (account) => {
@@ -231,6 +291,13 @@ export const auth = betterAuth({
                 },
               })
               .catch(() => {});
+            await logSecurityEvent({
+              userId: String(account.userId),
+              action: "social_linked",
+              title: "Discord Account Linked",
+              detail: `Connected Discord ID ${account.accountId}`,
+              status: "success",
+            });
           } else if (account.providerId === "github") {
             await users
               .updateOne(filter as never, {
@@ -240,7 +307,28 @@ export const auth = betterAuth({
                 },
               })
               .catch(() => {});
+            await logSecurityEvent({
+              userId: String(account.userId),
+              action: "social_linked",
+              title: "GitHub Account Linked",
+              detail: `Connected GitHub ID ${account.accountId}`,
+              status: "success",
+            });
           }
+        },
+      },
+    },
+    session: {
+      create: {
+        after: async (session) => {
+          if (!session?.userId) return;
+          await logSecurityEvent({
+            userId: String(session.userId),
+            action: "sign_in",
+            title: "New Sign-In Session",
+            detail: `${session.ipAddress || "Unknown IP"} · ${(session.userAgent || "Browser").slice(0, 60)}`,
+            status: "info",
+          });
         },
       },
     },
@@ -249,45 +337,66 @@ export const auth = betterAuth({
     jwt({
       disableSettingJwtHeader: true,
     }),
+    twoFactor({
+      issuer: SITE_SETTINGS.siteName,
+      totpOptions: {
+        digits: 6,
+        period: 30,
+      },
+      otpOptions: {
+        period: 5,
+        async sendOTP({ user, otp }) {
+          await sendOtpEmail({
+            to: user.email,
+            otp,
+            purpose: "2fa",
+          });
+        },
+      },
+      backupCodeOptions: {
+        amount: 10,
+        length: 10,
+      },
+    }),
+    emailOTP({
+      overrideDefaultEmailVerification: true,
+      otpLength: 6,
+      expiresIn: 300,
+      async sendVerificationOTP({ email, otp, type }) {
+        const purpose =
+          type === "sign-in"
+            ? "sign-in"
+            : type === "email-verification"
+              ? "email-verification"
+              : "forget-password";
+        await sendOtpEmail({
+          to: email,
+          otp,
+          purpose,
+        });
+      },
+    }),
     oauthProvider({
       loginPage: "/sign-in",
       consentPage: "/oauth/consent",
       scopes: SITE_SETTINGS.oauth.defaultScopes,
       allowPublicClientPrelogin: true,
       customUserInfoClaims: async ({ user }) => {
-        const u = user as unknown as Record<string, unknown>;
-        const discordId =
-          typeof u.discordId === "string" ? u.discordId : null;
-        const discordUsername =
-          typeof u.discordUsername === "string" ? u.discordUsername : null;
-        const githubId = typeof u.githubId === "string" ? u.githubId : null;
-        const githubUsername =
-          typeof u.githubUsername === "string" ? u.githubUsername : null;
-        const username =
-          typeof u.username === "string" ? u.username : null;
-        const sseRole = resolveSseRole(discordId, user.email);
-        return {
-          username,
-          discord_id: discordId,
-          discord_username: discordUsername,
-          github_id: githubId,
-          github_username: githubUsername,
-          sse_role: sseRole,
-        };
+        return resolveOidcClaims(user as unknown as Record<string, unknown>);
       },
       customIdTokenClaims: async ({ user }) => {
-        const u = user as unknown as Record<string, unknown>;
-        const discordId =
-          typeof u.discordId === "string" ? u.discordId : null;
-        const githubId = typeof u.githubId === "string" ? u.githubId : null;
-        const username =
-          typeof u.username === "string" ? u.username : null;
-        const sseRole = resolveSseRole(discordId, user.email);
+        const claims = await resolveOidcClaims(
+          user as unknown as Record<string, unknown>
+        );
         return {
-          username,
-          discord_id: discordId,
-          github_id: githubId,
-          sse_role: sseRole,
+          username: claims.username,
+          discord_id: claims.discord_id,
+          github_id: claims.github_id,
+          sse_role: claims.sse_role,
+          sse_roles: claims.sse_roles,
+          sse_permissions: claims.sse_permissions,
+          sse_badges: claims.sse_badges,
+          two_factor_enabled: claims.two_factor_enabled,
         };
       },
     }),

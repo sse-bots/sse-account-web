@@ -24,6 +24,7 @@ const AVAILABLE_SCOPES = [
   { id: "offline_access", label: "offline_access" },
   { id: "sse:servers", label: "sse:servers" },
   { id: "sse:activations", label: "sse:activations" },
+  { id: "sse:roles", label: "sse:roles" },
 ];
 
 interface OAuthClientRow {
@@ -58,6 +59,7 @@ export default function AdminOAuthClientsPage() {
     "offline_access",
     "sse:servers",
     "sse:activations",
+    "sse:roles",
   ]);
   const [skipConsent, setSkipConsent] = useState(true);
 

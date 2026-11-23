@@ -3,9 +3,10 @@
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2, Lock, Mail } from "lucide-react";
-import { signIn } from "@/lib/auth-client";
+import { KeyRound, Loader2, Lock, Mail, Send } from "lucide-react";
+import { authClient, signIn } from "@/lib/auth-client";
 import { useAuth } from "@/components/AuthContext";
+import { OtpCodeInput } from "@/components/OtpCodeInput";
 import { SITE_SETTINGS } from "@/lib/site-settings";
 
 function SignInInner() {
@@ -13,11 +14,15 @@ function SignInInner() {
   const router = useRouter();
   const { user, providers, loading: authLoading } = useAuth();
 
+  const [tab, setTab] = useState<"password" | "otp">("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState<"email" | "discord" | "github" | null>(
-    null
-  );
+  const [otpCode, setOtpCode] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCooldown, setOtpCooldown] = useState(0);
+  const [loading, setLoading] = useState<
+    "email" | "otp-send" | "otp-verify" | "discord" | "github" | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
 
   const hasOAuthFlow = Boolean(
@@ -48,6 +53,12 @@ function SignInInner() {
     }
   }, [authLoading, user, hasOAuthFlow, router, safeNext]);
 
+  useEffect(() => {
+    if (otpCooldown <= 0) return;
+    const t = window.setTimeout(() => setOtpCooldown((c) => c - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [otpCooldown]);
+
   async function handleEmailSignIn(e: React.FormEvent) {
     e.preventDefault();
     setLoading("email");
@@ -66,6 +77,13 @@ function SignInInner() {
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data = res?.data as any;
+      if (data?.twoFactorRedirect) {
+        window.location.assign(
+          `/two-factor?next=${encodeURIComponent(callbackURL)}`
+        );
+        return;
+      }
+
       if (data?.redirect && data?.url) {
         window.location.assign(data.url);
         return;
@@ -74,6 +92,51 @@ function SignInInner() {
       window.location.assign(callbackURL);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed.");
+      setLoading(null);
+    }
+  }
+
+  async function handleSendLoginOtp(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading("otp-send");
+    setError(null);
+    try {
+      const res = await authClient.emailOtp.sendVerificationOtp({
+        email: email.trim().toLowerCase(),
+        type: "sign-in",
+      });
+      if (res?.error) {
+        setError(res.error.message || "Could not send sign-in code.");
+        return;
+      }
+      setOtpSent(true);
+      setOtpCooldown(60);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send code.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function handleVerifyLoginOtp(codeOverride?: string) {
+    const clean = (codeOverride ?? otpCode).replace(/\D/g, "");
+    if (clean.length !== 6) return;
+    setLoading("otp-verify");
+    setError(null);
+    try {
+      const res = await authClient.signIn.emailOtp({
+        email: email.trim().toLowerCase(),
+        otp: clean,
+      });
+      if (res?.error) {
+        setError(res.error.message || "Invalid or expired 6-digit code.");
+        setOtpCode("");
+        setLoading(null);
+        return;
+      }
+      window.location.assign(callbackURL);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "OTP sign-in failed.");
       setLoading(null);
     }
   }
@@ -139,9 +202,46 @@ function SignInInner() {
           <p className="mt-1.5 text-xs text-slate-400">
             {hasOAuthFlow
               ? `Authenticate with your ${SITE_SETTINGS.brandPrefix} profile to continue to the requesting application.`
-              : `Use your ${SITE_SETTINGS.brandPrefix} email & password, Discord, or GitHub.`}
+              : `Protected by Two-Step Verification, Email OTP, Discord, and GitHub.`}
           </p>
         </div>
+
+        {/* Password vs Email Code Tabs */}
+        {SITE_SETTINGS.features.enableEmailPassword &&
+          SITE_SETTINGS.features.enableEmailOtpSignIn && (
+            <div className="mb-5 grid grid-cols-2 gap-1 rounded-2xl border border-slate-800 bg-slate-950 p-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setTab("password");
+                  setError(null);
+                }}
+                className={`inline-flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition ${
+                  tab === "password"
+                    ? "bg-indigo-600 text-white"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Lock className="h-3.5 w-3.5" />
+                Password
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTab("otp");
+                  setError(null);
+                }}
+                className={`inline-flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition ${
+                  tab === "otp"
+                    ? "bg-indigo-600 text-white"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+                Email Code
+              </button>
+            </div>
+          )}
 
         {error && (
           <div className="mb-4 rounded-xl border border-rose-500/40 bg-rose-500/10 p-3 text-xs text-rose-300">
@@ -149,7 +249,8 @@ function SignInInner() {
           </div>
         )}
 
-        {SITE_SETTINGS.features.enableEmailPassword && (
+        {/* Password Sign-In Form */}
+        {SITE_SETTINGS.features.enableEmailPassword && tab === "password" && (
           <form onSubmit={handleEmailSignIn} className="space-y-3.5">
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-300">
@@ -170,9 +271,17 @@ function SignInInner() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-300">
-                Password
-              </label>
+              <div className="mb-1 flex items-center justify-between">
+                <label className="text-xs font-medium text-slate-300">
+                  Password
+                </label>
+                <Link
+                  href="/forgot-password"
+                  className="text-[11px] font-semibold text-indigo-400 hover:underline"
+                >
+                  Forgot password?
+                </Link>
+              </div>
               <div className="relative">
                 <Lock className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
                 <input
@@ -198,6 +307,70 @@ function SignInInner() {
               Sign In
             </button>
           </form>
+        )}
+
+        {/* Passwordless 6-Digit Email OTP Sign-In */}
+        {SITE_SETTINGS.features.enableEmailOtpSignIn && tab === "otp" && (
+          <div className="space-y-4">
+            <form onSubmit={handleSendLoginOtp} className="space-y-3">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-300">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full rounded-xl border border-slate-800 bg-slate-950 py-2.5 pl-9 pr-3 text-xs text-white placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading !== null || otpCooldown > 0}
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-indigo-500/40 bg-indigo-500/15 px-4 py-2.5 text-xs font-bold text-indigo-300 transition hover:bg-indigo-500/25 disabled:opacity-60"
+              >
+                {loading === "otp-send" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
+                {otpCooldown > 0
+                  ? `Resend Code in ${otpCooldown}s`
+                  : otpSent
+                    ? "Resend 6-Digit Code"
+                    : "Send 6-Digit Sign-In Code"}
+              </button>
+            </form>
+
+            {otpSent && (
+              <div className="space-y-4 border-t border-slate-800 pt-4">
+                <OtpCodeInput
+                  value={otpCode}
+                  onChange={setOtpCode}
+                  onComplete={(c) => handleVerifyLoginOtp(c)}
+                  disabled={loading !== null}
+                  error={Boolean(error)}
+                />
+                <button
+                  type="button"
+                  disabled={loading !== null || otpCode.length < 6}
+                  onClick={() => handleVerifyLoginOtp()}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-500 disabled:opacity-50"
+                >
+                  {loading === "otp-verify" && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
+                  Verify &amp; Sign In
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         {showSocialDivider && (

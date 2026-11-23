@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Award,
   FileText,
   Globe,
   Home,
@@ -17,6 +18,7 @@ import {
   Search,
   Shield,
   Sun,
+  Tag,
   User,
   UserPlus,
   Users,
@@ -123,12 +125,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ]),
   ];
 
-  const adminLinks = user?.isAdmin
-    ? [
-        { href: "/admin/oauth-clients", label: "OAuth / SSO Apps", icon: Globe },
-        { href: "/admin/users", label: "Registered Users", icon: Users },
-      ]
-    : [];
+  const perms = user?.permissions || [];
+  const canManageOAuth = Boolean(
+    user?.isAdmin || perms.includes("*") || perms.includes("oauth:manage")
+  );
+  const canManageRoles = Boolean(
+    user?.isAdmin || perms.includes("*") || perms.includes("roles:manage")
+  );
+  const canManageUsers = Boolean(
+    user?.isAdmin || perms.includes("*") || perms.includes("users:manage")
+  );
+
+  const adminLinks = [
+    ...(canManageRoles
+      ? [
+          { href: "/admin/roles", label: "Roles & Permissions", icon: Tag },
+          { href: "/admin/badges", label: "Badges Studio", icon: Award },
+        ]
+      : []),
+    ...(canManageUsers
+      ? [{ href: "/admin/users", label: "Registered Users", icon: Users }]
+      : []),
+    ...(canManageOAuth
+      ? [{ href: "/admin/oauth-clients", label: "OAuth / SSO Apps", icon: Globe }]
+      : []),
+  ];
 
   const legalLinks = [
     { href: "/privacy", label: "Privacy Policy", icon: Scale },
@@ -238,7 +259,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   Identity Admin
                 </span>
                 <span className="rounded bg-indigo-500/20 px-1.5 py-0.5 text-[9px] font-bold text-indigo-300">
-                  {user?.isOwner ? "OWNER" : "ADMIN"}
+                  {user?.isAdmin ? "ADMIN" : (user?.role || "STAFF").toUpperCase()}
                 </span>
               </div>
               <nav className="space-y-1">

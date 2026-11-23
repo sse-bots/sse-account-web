@@ -9,11 +9,13 @@ import {
   useState,
 } from "react";
 import { usePathname } from "next/navigation";
+import type { UserBadgeItem } from "@/lib/badges";
 
 export interface LinkedAccountSummary {
   id: string;
   providerId: string;
   accountId: string;
+  username: string | null;
   createdAt: string | null;
 }
 
@@ -23,6 +25,8 @@ export interface AuthUser {
   name: string;
   username: string | null;
   bio: string | null;
+  isPublicProfile: boolean;
+  showPublicSocials: boolean;
   email: string;
   emailVerified: boolean;
   image: string | null;
@@ -31,9 +35,24 @@ export interface AuthUser {
   githubId: string | null;
   githubUsername: string | null;
   hasPassword: boolean;
+  twoFactorEnabled: boolean;
+  securityScore: number;
   linkedProviders: string[];
   linkedAccounts: LinkedAccountSummary[];
-  role: "owner" | "admin" | "user";
+  connectedAppsCount: number;
+  role: string;
+  roles: string[];
+  roleDetails: Array<{
+    slug: string;
+    name: string;
+    color: string;
+    priority: number;
+    isSystem: boolean;
+  }>;
+  permissions: string[];
+  badges: UserBadgeItem[];
+  allBadges: UserBadgeItem[];
+  isEnvAdmin: boolean;
   isOwner: boolean;
   isAdmin: boolean;
   createdAt: string | null;
@@ -42,6 +61,7 @@ export interface AuthUser {
 export interface ConfiguredProviders {
   discord: boolean;
   github: boolean;
+  emailOtp: boolean;
 }
 
 interface AuthContextValue {
@@ -60,6 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [providers, setProviders] = useState<ConfiguredProviders>({
     discord: true,
     github: true,
+    emailOtp: false,
   });
   const [loading, setLoading] = useState(true);
   const inflightRef = useRef<Promise<AuthUser | null> | null>(null);
