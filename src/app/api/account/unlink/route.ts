@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import type { Document, Filter } from "mongodb";
 import { z } from "zod";
 import { getAuthSession } from "@/lib/session";
-import { getAuthCollections, userDocMatch, userIdFilter } from "@/lib/mongodb";
+import {
+  getAuthCollections,
+  logSecurityEvent,
+  userDocMatch,
+  userIdFilter,
+} from "@/lib/mongodb";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,10 +33,15 @@ export async function POST(req: Request) {
 
   const { providerId } = parsed.data;
   const { accounts, users } = await getAuthCollections();
-  const userAccounts = await accounts
-    .find({ userId: userIdFilter(ctx.userId) })
-    .toArray();
+  const userDoc = await users.findOne(
+    userDocMatch(ctx.userId) as unknown as Filter<Document>
+  );
+  const idMatch = userIdFilter(
+    ctx.userId,
+    userDoc?._id ? String(userDoc._id) : null
+  );
 
+  const userAccounts = await accounts.find({ userId: idMatch }).toArray();
   const target = userAccounts.find((a) => a.providerId === providerId);
   if (!target) {
     return NextResponse.json(
@@ -40,7 +50,6 @@ export async function POST(req: Request) {
     );
   }
 
-  // Prevent lockout: require at least one remaining login method (password or another social provider)
   const remainingMethods = userAccounts.filter(
     (a) => a.providerId !== providerId
   );
@@ -54,10 +63,7 @@ export async function POST(req: Request) {
     );
   }
 
-  await accounts.deleteMany({
-    userId: userIdFilter(ctx.userId),
-    providerId,
-  });
+  await accounts.deleteMany({ userId: idMatch, providerId });
 
   const unsetFields =
     providerId === "discord"
@@ -68,6 +74,14 @@ export async function POST(req: Request) {
     userDocMatch(ctx.userId) as unknown as Filter<Document>,
     { $set: { ...unsetFields, updatedAt: new Date() } }
   );
+
+  await logSecurityEvent({
+    userId: ctx.userId,
+    action: "social_unlinked",
+    title: `${providerId === "discord" ? "Discord" : "GitHub"} Account Unlinked`,
+    detail: `Disconnected ${providerId} from SSE profile`,
+    status: "warning",
+  });
 
   return NextResponse.json({ ok: true });
 }

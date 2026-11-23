@@ -30,6 +30,8 @@ const updateProfileSchema = z.object({
     .url("Avatar must be a valid URL.")
     .optional()
     .or(z.literal("")),
+  isPublicProfile: z.boolean().optional(),
+  showPublicSocials: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -54,7 +56,7 @@ export async function PATCH(req: Request) {
     );
   }
 
-  const { name, username, email, bio, image } = parsed.data;
+  const { name, username, email, bio, image, isPublicProfile, showPublicSocials } = parsed.data;
   const cleanEmail = email.toLowerCase();
   const cleanUsername = username ? username.toLowerCase() : null;
   const { users } = await getAuthCollections();
@@ -97,8 +99,13 @@ export async function PATCH(req: Request) {
         name,
         username: cleanUsername,
         email: cleanEmail,
+        ...(cleanEmail !== ctx.email.toLowerCase()
+          ? { emailVerified: false }
+          : {}),
         bio: bio || null,
         image: image || null,
+        ...(isPublicProfile !== undefined ? { isPublicProfile } : {}),
+        ...(showPublicSocials !== undefined ? { showPublicSocials } : {}),
         updatedAt: new Date(),
       },
     }

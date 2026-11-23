@@ -359,3 +359,65 @@ html.light .bg-\[\#5865F2\] * {
 .animate-menu-item {
   animation: menuItemStagger 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
+
+
+/* ==========================================================================
+   7. Two-Step Vault, OTP Box & Badge Showcase Micro-Animations
+   ========================================================================== */
+@keyframes otpPop {
+  0% {
+    transform: scale(0.92);
+  }
+  55% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes otpShake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20%, 60% {
+    transform: translateX(-6px);
+  }
+  40%, 80% {
+    transform: translateX(6px);
+  }
+}
+
+@keyframes vaultFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-otp-pop {
+  animation: otpPop 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.animate-otp-shake {
+  animation: otpShake 0.34s ease-in-out;
+}
+
+.animate-vault-float {
+  animation: vaultFloat 3.4s ease-in-out infinite;
+}
+
+/* Light mode polish for new semantic tint colors (cyan, purple, pink) */
+html.light .text-cyan-300,
+html.light .text-cyan-400 {
+  color: #0e7490 !important;
+}
+html.light .text-purple-300,
+html.light .text-purple-400 {
+  color: #7e22ce !important;
+}
+html.light .bg-slate-950\/30 {
+  background-color: var(--surface-input) !important;
+}

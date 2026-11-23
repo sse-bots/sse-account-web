@@ -1,18 +1,31 @@
 import { headers } from "next/headers";
 import type { Document, Filter } from "mongodb";
-import { auth, resolveSseRole } from "./auth";
+import { auth } from "./auth";
 import {
   getAuthCollections,
   getMongoClient,
   userDocMatch,
   userIdFilter,
 } from "./mongodb";
+import { RoleBadge, resolveUserRolesAndPermissions } from "./roles";
+import { UserBadgeItem, resolveUserBadges } from "./badges";
 
 export interface LinkedAccountSummary {
   id: string;
   providerId: string;
   accountId: string;
+  username: string | null;
   createdAt: string | null;
+}
+
+export interface ConnectedAppSummary {
+  clientId: string;
+  clientName: string;
+  clientUri: string | null;
+  clientIcon: string | null;
+  scopes: string[];
+  connectionType: "trusted" | "authorized";
+  connectedAt: string | null;
 }
 
 export interface AuthSessionContext {
@@ -21,6 +34,8 @@ export interface AuthSessionContext {
   name: string;
   username: string | null;
   bio: string | null;
+  isPublicProfile: boolean;
+  showPublicSocials: boolean;
   email: string;
   emailVerified: boolean;
   image: string | null;
@@ -29,9 +44,18 @@ export interface AuthSessionContext {
   githubId: string | null;
   githubUsername: string | null;
   hasPassword: boolean;
+  twoFactorEnabled: boolean;
+  securityScore: number;
   linkedProviders: string[];
   linkedAccounts: LinkedAccountSummary[];
-  role: "owner" | "admin" | "user";
+  connectedAppsCount: number;
+  role: string;
+  roles: string[];
+  roleDetails: RoleBadge[];
+  permissions: string[];
+  badges: UserBadgeItem[];
+  allBadges: UserBadgeItem[];
+  isEnvAdmin: boolean;
   isOwner: boolean;
   isAdmin: boolean;
   createdAt: string | null;
@@ -74,6 +98,116 @@ async function fetchSocialUsername(
   }
 }
 
+/**
+ * Fetches ALL connected OAuth applications for a user by merging:
+ *  - oauthConsent (explicitly approved apps)
+ *  - oauthAccessToken (active sessions, including Trusted First-Party skipConsent apps like SSE Nexus!)
+ *  - oauthRefreshToken (persistent logins)
+ */
+export async function getConnectedAppsForUser(
+  ...userIds: Array<string | null | undefined>
+): Promise<ConnectedAppSummary[]> {
+  const {
+    oauthConsents,
+    oauthAccessTokens,
+    oauthRefreshTokens,
+    oauthClients,
+  } = await getAuthCollections();
+
+  const filter = { userId: userIdFilter(...userIds) };
+  const [consents, accessTokens, refreshTokens] = await Promise.all([
+    oauthConsents.find(filter).toArray(),
+    oauthAccessTokens.find(filter).toArray(),
+    oauthRefreshTokens.find(filter).toArray(),
+  ]);
+
+  const byClient = new Map<
+    string,
+    {
+      scopes: Set<string>;
+      hasConsent: boolean;
+      connectedAt: Date | null;
+    }
+  >();
+
+  const record = (
+    clientId: string,
+    rawScopes: unknown,
+    isConsent: boolean,
+    ts: unknown
+  ) => {
+    if (!clientId) return;
+    let entry = byClient.get(clientId);
+    if (!entry) {
+      entry = { scopes: new Set<string>(), hasConsent: false, connectedAt: null };
+      byClient.set(clientId, entry);
+    }
+    if (isConsent) entry.hasConsent = true;
+
+    if (Array.isArray(rawScopes)) {
+      for (const s of rawScopes) {
+        if (s) entry.scopes.add(String(s));
+      }
+    } else if (typeof rawScopes === "string") {
+      for (const s of rawScopes.split(/\s+/).filter(Boolean)) {
+        entry.scopes.add(s);
+      }
+    }
+
+    if (ts) {
+      const dt = new Date(ts as string | Date);
+      if (
+        !Number.isNaN(dt.getTime()) &&
+        (!entry.connectedAt || dt.getTime() > entry.connectedAt.getTime())
+      ) {
+        entry.connectedAt = dt;
+      }
+    }
+  };
+
+  for (const c of consents) {
+    record(String(c.clientId || ""), c.scopes, true, c.updatedAt || c.createdAt);
+  }
+  for (const t of accessTokens) {
+    record(String(t.clientId || ""), t.scopes, false, t.createdAt);
+  }
+  for (const r of refreshTokens) {
+    record(String(r.clientId || ""), r.scopes, false, r.createdAt);
+  }
+
+  const clientIds = Array.from(byClient.keys());
+  if (clientIds.length === 0) return [];
+
+  const clients = await oauthClients
+    .find({ clientId: { $in: clientIds } })
+    .toArray();
+  const clientMap = new Map(clients.map((c) => [String(c.clientId), c]));
+
+  return clientIds
+    .map((cid) => {
+      const meta = clientMap.get(cid);
+      const info = byClient.get(cid)!;
+      const defaultScopes = Array.isArray(meta?.scopes)
+        ? meta.scopes.map(String)
+        : [];
+      const scopes =
+        info.scopes.size > 0 ? Array.from(info.scopes) : defaultScopes;
+
+      return {
+        clientId: cid,
+        clientName: String(meta?.name || cid),
+        clientUri: typeof meta?.uri === "string" ? meta.uri : null,
+        clientIcon: typeof meta?.icon === "string" ? meta.icon : null,
+        scopes,
+        connectionType: (meta?.skipConsent && !info.hasConsent
+          ? "trusted"
+          : "authorized") as "trusted" | "authorized",
+        connectedAt: info.connectedAt ? info.connectedAt.toISOString() : null,
+      };
+    })
+    .sort((a, b) => a.clientName.localeCompare(b.clientName));
+}
+
 export async function getAuthSession(): Promise<AuthSessionContext | null> {
   await getMongoClient();
 
@@ -81,10 +215,22 @@ export async function getAuthSession(): Promise<AuthSessionContext | null> {
   const session = await auth.api.getSession({ headers: hdrs });
   if (!session?.user) return null;
 
-  const { users, accounts } = await getAuthCollections();
-  const [userDoc, userAccounts] = await Promise.all([
-    users.findOne(userDocMatch(session.user.id) as unknown as Filter<Document>),
-    accounts.find({ userId: userIdFilter(session.user.id) }).toArray(),
+  const { users, accounts, twoFactors } = await getAuthCollections();
+  const userDoc = await users.findOne(
+    userDocMatch(session.user.id) as unknown as Filter<Document>
+  );
+
+  // Match BOTH session.user.id and userDoc._id (string & ObjectId) so linked social accounts are NEVER missed!
+  const allUserIds = [
+    session.user.id,
+    userDoc?._id ? String(userDoc._id) : null,
+    typeof userDoc?.id === "string" ? userDoc.id : null,
+  ];
+
+  const [userAccounts, twoFactorDoc, connectedApps] = await Promise.all([
+    accounts.find({ userId: userIdFilter(...allUserIds) }).toArray(),
+    twoFactors.findOne({ userId: userIdFilter(...allUserIds) }),
+    getConnectedAppsForUser(...allUserIds),
   ]);
 
   const discordAccount = userAccounts.find((a) => a.providerId === "discord");
@@ -111,7 +257,6 @@ export async function getAuthSession(): Promise<AuthSessionContext | null> {
       ? userDoc.githubUsername
       : null;
 
-  // Backfill linked IDs & usernames once after account linking (without touching user's display name or email)
   const backfill: Record<string, unknown> = {};
   if (discordId && userDoc && userDoc.discordId !== discordId) {
     backfill.discordId = discordId;
@@ -147,6 +292,9 @@ export async function getAuthSession(): Promise<AuthSessionContext | null> {
       backfill.githubUsername = fetched;
     }
   }
+  if (userDoc && !Array.isArray(userDoc.roles)) {
+    backfill.roles = ["member"];
+  }
 
   if (userDoc && Object.keys(backfill).length > 0) {
     await users
@@ -162,38 +310,89 @@ export async function getAuthSession(): Promise<AuthSessionContext | null> {
   );
   const linkedAccounts: LinkedAccountSummary[] = userAccounts
     .filter((a) => a.providerId !== "credential")
-    .map((a) => ({
-      id: String(a.id || a._id),
-      providerId: String(a.providerId),
-      accountId: String(a.accountId || ""),
-      createdAt: a.createdAt
-        ? new Date(a.createdAt as string | Date).toISOString()
-        : null,
-    }));
+    .map((a) => {
+      const pid = String(a.providerId);
+      return {
+        id: String(a.id || a._id),
+        providerId: pid,
+        accountId: String(a.accountId || ""),
+        username:
+          pid === "discord"
+            ? discordUsername
+            : pid === "github"
+              ? githubUsername
+              : null,
+        createdAt: a.createdAt
+          ? new Date(a.createdAt as string | Date).toISOString()
+          : null,
+      };
+    });
 
   const resolvedEmail = String(userDoc?.email || session.user.email || "");
-  const role = resolveSseRole(discordId, resolvedEmail);
+  const emailVerified = Boolean(
+    userDoc?.emailVerified ?? session.user.emailVerified
+  );
+  const twoFactorEnabled = Boolean(
+    userDoc?.twoFactorEnabled ??
+      (session.user as unknown as Record<string, unknown>).twoFactorEnabled ??
+      (twoFactorDoc && twoFactorDoc.verified !== false)
+  );
+
+  const roleState = await resolveUserRolesAndPermissions({
+    storedRoles: userDoc?.roles,
+    discordId,
+    email: resolvedEmail,
+  });
+
+  const badgeState = await resolveUserBadges({
+    storedBadges: userDoc?.badges,
+    pinnedBadges: userDoc?.pinnedBadges,
+    twoFactorEnabled,
+    emailVerified,
+    discordLinked: Boolean(discordId),
+    githubLinked: Boolean(githubId),
+    isAdmin: roleState.isAdmin,
+  });
+
+  // Compute live Security Score (0–100)
+  let securityScore = 15; // base account
+  if (hasPassword) securityScore += 15;
+  if (emailVerified) securityScore += 15;
+  if (discordId || githubId) securityScore += 15;
+  if (discordId && githubId) securityScore += 5;
+  if (twoFactorEnabled) securityScore += 35;
+  securityScore = Math.min(100, securityScore);
 
   return {
     userId: session.user.id,
     sessionId: session.session.id,
     name: String(userDoc?.name || session.user.name || "User"),
-    username:
-      typeof userDoc?.username === "string" ? userDoc.username : null,
+    username: typeof userDoc?.username === "string" ? userDoc.username : null,
     bio: typeof userDoc?.bio === "string" ? userDoc.bio : null,
+    isPublicProfile: userDoc?.isPublicProfile !== false,
+    showPublicSocials: userDoc?.showPublicSocials !== false,
     email: resolvedEmail,
-    emailVerified: Boolean(userDoc?.emailVerified ?? session.user.emailVerified),
+    emailVerified,
     image: (userDoc?.image as string | null) ?? session.user.image ?? null,
     discordId,
     discordUsername,
     githubId,
     githubUsername,
     hasPassword,
+    twoFactorEnabled,
+    securityScore,
     linkedProviders,
     linkedAccounts,
-    role,
-    isOwner: role === "owner",
-    isAdmin: role === "owner" || role === "admin",
+    connectedAppsCount: connectedApps.length,
+    role: roleState.primaryRole,
+    roles: roleState.roles,
+    roleDetails: roleState.roleDetails,
+    permissions: roleState.permissions,
+    badges: badgeState.earnedBadges,
+    allBadges: badgeState.allBadges,
+    isEnvAdmin: roleState.isEnvAdmin,
+    isOwner: roleState.isOwner,
+    isAdmin: roleState.isAdmin,
     createdAt: userDoc?.createdAt
       ? new Date(userDoc.createdAt as string | Date).toISOString()
       : null,

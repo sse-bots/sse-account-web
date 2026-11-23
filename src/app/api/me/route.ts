@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthSession } from "@/lib/session";
 import { getConfiguredSocialProviders } from "@/lib/auth";
+import { isEmailProviderConfigured } from "@/lib/mailer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,10 @@ const NO_CACHE_HEADERS = {
 };
 
 export async function GET() {
-  const providers = getConfiguredSocialProviders();
+  const providers = {
+    ...getConfiguredSocialProviders(),
+    emailOtp: isEmailProviderConfigured(),
+  };
   try {
     const user = await getAuthSession();
     if (!user) {
