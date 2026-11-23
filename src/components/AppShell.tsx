@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   FileText,
   Globe,
@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
+import { useAuth } from "@/components/AuthContext";
 import { SITE_SETTINGS } from "@/lib/site-settings";
 import { ThemeCustomizer } from "@/components/ThemeCustomizer";
 import {
@@ -35,22 +36,9 @@ import {
   saveThemeState,
 } from "@/lib/theme-config";
 
-interface MeUser {
-  userId: string;
-  name: string;
-  email: string;
-  discordId: string | null;
-  image: string | null;
-  role: "owner" | "admin" | "user";
-  isOwner: boolean;
-  isAdmin: boolean;
-}
-
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [user, setUser] = useState<MeUser | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const { user, loading: authLoading, clearUser } = useAuth();
   const [dockOpen, setDockOpen] = useState(false);
   const [quickFilter, setQuickFilter] = useState("");
   const [theme, setTheme] = useState<ThemeState>({
@@ -81,17 +69,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
-    fetch("/api/me", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.authenticated && d.user) setUser(d.user);
-        else setUser(null);
-      })
-      .catch(() => setUser(null))
-      .finally(() => setLoaded(true));
-  }, [pathname]);
-
-  useEffect(() => {
     setDockOpen(false);
     setQuickFilter("");
   }, [pathname]);
@@ -111,27 +88,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   async function handleSignOut() {
-    await signOut();
-    setUser(null);
     setDockOpen(false);
-    router.push("/");
-    router.refresh();
+    try {
+      await signOut();
+    } finally {
+      clearUser();
+      window.location.assign("/");
+    }
   }
 
   const primaryLinks = [
     { href: "/", label: "Home", icon: Home },
     ...(user
       ? [
-          { href: "/account", label: `${SITE_SETTINGS.brandPrefix} Profile`, icon: User },
-          { href: "/account/security", label: "Security & Links", icon: KeyRound },
+          {
+            href: "/account",
+            label: `${SITE_SETTINGS.brandPrefix} Profile`,
+            icon: User,
+          },
+          {
+            href: "/account/security",
+            label: "Security & Links",
+            icon: KeyRound,
+          },
           { href: "/account/apps", label: "Connected Apps", icon: Globe },
         ]
-      : [
-          { href: "/sign-in", label: "Sign In", icon: LogIn },
-          ...(SITE_SETTINGS.features.enablePublicSignUp
-            ? [{ href: "/sign-up", label: "Create Account", icon: UserPlus }]
-            : []),
-        ]),
+      : authLoading
+        ? []
+        : [
+            { href: "/sign-in", label: "Sign In", icon: LogIn },
+            ...(SITE_SETTINGS.features.enablePublicSignUp
+              ? [{ href: "/sign-up", label: "Create Account", icon: UserPlus }]
+              : []),
+          ]),
   ];
 
   const adminLinks = user?.isAdmin
@@ -233,6 +222,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   i
                 )
               )}
+              {authLoading && (
+                <div className="space-y-1.5 px-1 pt-1">
+                  <div className="h-8 animate-pulse rounded-xl bg-slate-800/70" />
+                  <div className="h-8 animate-pulse rounded-xl bg-slate-800/50" />
+                </div>
+              )}
             </nav>
           </div>
 
@@ -266,7 +261,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
           </div>
 
-          {!loaded ? (
+          {authLoading ? (
             <div className="h-11 animate-pulse rounded-xl bg-slate-800/70" />
           ) : user ? (
             <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-800 bg-slate-900/80 p-2">
@@ -332,7 +327,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   className="h-1.5 w-1.5 rounded-full"
                   style={{ backgroundColor: activePrimaryColor.c500 }}
                 />
-                <span>{activePresetLabel}</span>
+                <span>{user ? user.name : activePresetLabel}</span>
               </div>
             </div>
           </Link>
@@ -439,36 +434,47 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   />
                 ) : (
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-xs font-extrabold text-white">
-                    {SITE_SETTINGS.shortName}
+                    {user
+                      ? user.name.slice(0, 2).toUpperCase()
+                      : SITE_SETTINGS.shortName}
                   </div>
                 )}
                 <div className="min-w-0">
                   <div className="truncate text-sm font-bold text-white">
-                    {user ? user.name : "Not signed in"}
+                    {authLoading
+                      ? "Checking session..."
+                      : user
+                        ? user.name
+                        : "Not signed in"}
                   </div>
                   <div className="truncate text-[11px] text-slate-400">
-                    {user ? user.email : `Sign in to ${SITE_SETTINGS.siteName}`}
+                    {authLoading
+                      ? "Please wait"
+                      : user
+                        ? user.email
+                        : `Sign in to ${SITE_SETTINGS.siteName}`}
                   </div>
                 </div>
               </div>
 
-              {user ? (
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300"
-                >
-                  <LogOut className="h-3.5 w-3.5" />
-                  Logout
-                </button>
-              ) : (
-                <Link
-                  href="/sign-in"
-                  className="rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white"
-                >
-                  Sign In
-                </Link>
-              )}
+              {!authLoading &&
+                (user ? (
+                  <button
+                    type="button"
+                    onClick={handleSignOut}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300"
+                  >
+                    <LogOut className="h-3.5 w-3.5" />
+                    Logout
+                  </button>
+                ) : (
+                  <Link
+                    href="/sign-in"
+                    className="rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white"
+                  >
+                    Sign In
+                  </Link>
+                ))}
             </div>
 
             <div className="space-y-1">
@@ -491,7 +497,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
                 <div className="space-y-1">
                   {filteredAdmin.map((l, i) =>
-                    renderNavLink(l.href, l.label, l.icon, false, i + filteredPrimary.length)
+                    renderNavLink(
+                      l.href,
+                      l.label,
+                      l.icon,
+                      false,
+                      i + filteredPrimary.length
+                    )
                   )}
                 </div>
               </div>

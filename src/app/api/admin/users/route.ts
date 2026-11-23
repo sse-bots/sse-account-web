@@ -3,6 +3,9 @@ import { getAuthSession } from "@/lib/session";
 import { getAuthCollections, serializeDoc } from "@/lib/mongodb";
 import { resolveSseRole } from "@/lib/auth";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   const ctx = await getAuthSession();
   if (!ctx || !ctx.isAdmin) {

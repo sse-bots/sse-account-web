@@ -1,15 +1,13 @@
-import Link from "next/link";
 import {
-  ArrowRight,
   ExternalLink,
   Globe,
   KeyRound,
   ShieldCheck,
   Sparkles,
-  UserPlus,
 } from "lucide-react";
 import { getAuthCollections } from "@/lib/mongodb";
 import { SITE_SETTINGS } from "@/lib/site-settings";
+import { HomeHeroActions } from "@/components/HomeHeroActions";
 
 export const dynamic = "force-dynamic";
 
@@ -48,24 +46,7 @@ export default async function HomePage() {
             {SITE_SETTINGS.description}
           </p>
 
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Link
-              href="/account"
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:bg-indigo-500"
-            >
-              Manage My Profile
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-            {SITE_SETTINGS.features.enablePublicSignUp && (
-              <Link
-                href="/sign-up"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900/70 px-5 py-3 text-sm font-semibold text-slate-200 transition hover:border-indigo-500 hover:bg-slate-800"
-              >
-                <UserPlus className="h-4 w-4" />
-                Create {SITE_SETTINGS.brandPrefix} Account
-              </Link>
-            )}
-          </div>
+          <HomeHeroActions />
         </div>
 
         <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">

@@ -7,6 +7,9 @@ import { fetchDiscordGuildsForUser } from "@/lib/discord-oauth";
  * Client apps call this endpoint with `Authorization: Bearer <sse_oauth_access_token>`
  * so DISCORD_CLIENT_SECRET stays exclusively inside this central auth service.
  */
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   const authHeader = req.headers.get("authorization") || "";
   if (!authHeader.toLowerCase().startsWith("bearer ")) {

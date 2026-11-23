@@ -26,7 +26,7 @@ export default function AdminUsersPage() {
     try {
       const res = await fetch(
         `/api/admin/users?q=${encodeURIComponent(query)}`,
-        { cache: "no-store" }
+        { cache: "no-store", credentials: "include" }
       );
       const j = await res.json();
       if (!res.ok) {

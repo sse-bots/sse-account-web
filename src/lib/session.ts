@@ -1,7 +1,12 @@
 import { headers } from "next/headers";
 import type { Document, Filter } from "mongodb";
 import { auth, resolveSseRole } from "./auth";
-import { getAuthCollections, userIdFilter } from "./mongodb";
+import {
+  getAuthCollections,
+  getMongoClient,
+  userDocMatch,
+  userIdFilter,
+} from "./mongodb";
 
 export interface AuthSessionContext {
   userId: string;
@@ -23,18 +28,20 @@ export interface AuthSessionContext {
 }
 
 export async function getAuthSession(): Promise<AuthSessionContext | null> {
+  await getMongoClient();
+
   const hdrs = await headers();
   const session = await auth.api.getSession({ headers: hdrs });
   if (!session?.user) return null;
 
   const { users, accounts } = await getAuthCollections();
   const [userDoc, userAccounts] = await Promise.all([
-    users.findOne({ _id: userIdFilter(session.user.id) } as unknown as Filter<Document>),
+    users.findOne(userDocMatch(session.user.id) as unknown as Filter<Document>),
     accounts.find({ userId: userIdFilter(session.user.id) }).toArray(),
   ]);
 
   const discordAccount = userAccounts.find((a) => a.providerId === "discord");
-  let discordId =
+  const discordId =
     typeof userDoc?.discordId === "string" && userDoc.discordId
       ? userDoc.discordId
       : discordAccount?.accountId
@@ -43,10 +50,7 @@ export async function getAuthSession(): Promise<AuthSessionContext | null> {
 
   if (discordId && userDoc && !userDoc.discordId) {
     await users
-      .updateOne(
-        { _id: userDoc._id },
-        { $set: { discordId } }
-      )
+      .updateOne({ _id: userDoc._id }, { $set: { discordId } })
       .catch(() => {});
   }
 
@@ -57,7 +61,8 @@ export async function getAuthSession(): Promise<AuthSessionContext | null> {
     new Set(userAccounts.map((a) => String(a.providerId)))
   );
 
-  const role = resolveSseRole(discordId, session.user.email);
+  const resolvedEmail = String(userDoc?.email || session.user.email || "");
+  const role = resolveSseRole(discordId, resolvedEmail);
 
   return {
     userId: session.user.id,
@@ -66,7 +71,7 @@ export async function getAuthSession(): Promise<AuthSessionContext | null> {
     username:
       typeof userDoc?.username === "string" ? userDoc.username : null,
     bio: typeof userDoc?.bio === "string" ? userDoc.bio : null,
-    email: String(userDoc?.email || session.user.email || ""),
+    email: resolvedEmail,
     emailVerified: Boolean(userDoc?.emailVerified ?? session.user.emailVerified),
     image: (userDoc?.image as string | null) ?? session.user.image ?? null,
     discordId,

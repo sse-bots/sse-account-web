@@ -83,7 +83,7 @@ export default function AdminOAuthClientsPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/admin/oauth-clients", { cache: "no-store" });
+      const res = await fetch("/api/admin/oauth-clients", { cache: "no-store", credentials: "include" });
       if (res.ok) {
         const j = await res.json();
         setClients(j.clients || []);
@@ -117,6 +117,7 @@ export default function AdminOAuthClientsPage() {
 
     const res = await fetch("/api/admin/oauth-clients", {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name,
@@ -171,6 +172,7 @@ export default function AdminOAuthClientsPage() {
         .filter(Boolean);
       const res = await fetch("/api/admin/oauth-clients", {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clientId: editingId,
@@ -207,6 +209,7 @@ export default function AdminOAuthClientsPage() {
     try {
       const res = await fetch("/api/admin/oauth-clients", {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clientId: c.clientId,
@@ -240,6 +243,7 @@ export default function AdminOAuthClientsPage() {
     try {
       await fetch("/api/admin/oauth-clients", {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           clientId: c.clientId,
@@ -262,7 +266,7 @@ export default function AdminOAuthClientsPage() {
     }
     await fetch(
       `/api/admin/oauth-clients?clientId=${encodeURIComponent(c.clientId)}`,
-      { method: "DELETE" }
+      { method: "DELETE", credentials: "include" }
     );
     if (editingId === c.clientId) setEditingId(null);
     await load();

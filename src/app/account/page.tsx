@@ -1,25 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { CheckCircle2, Save, ShieldCheck, User } from "lucide-react";
+import { useAuth } from "@/components/AuthContext";
 import { SITE_SETTINGS } from "@/lib/site-settings";
 
-interface ProfileUser {
-  userId: string;
-  name: string;
-  username: string | null;
-  bio: string | null;
-  email: string;
-  image: string | null;
-  discordId: string | null;
-  discordUsername: string | null;
-  role: "owner" | "admin" | "user";
-}
-
 export default function AccountProfilePage() {
-  const [user, setUser] = useState<ProfileUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { user, refreshUser } = useAuth();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,20 +18,13 @@ export default function AccountProfilePage() {
   const [image, setImage] = useState("");
 
   useEffect(() => {
-    fetch("/api/account/profile", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (d?.user) {
-          setUser(d.user);
-          setName(d.user.name || "");
-          setUsername(d.user.username || "");
-          setEmail(d.user.email || "");
-          setBio(d.user.bio || "");
-          setImage(d.user.image || "");
-        }
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    if (!user) return;
+    setName(user.name || "");
+    setUsername(user.username || "");
+    setEmail(user.email || "");
+    setBio(user.bio || "");
+    setImage(user.image || "");
+  }, [user]);
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -54,6 +34,7 @@ export default function AccountProfilePage() {
     try {
       const res = await fetch("/api/account/profile", {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, username, email, bio, image }),
       });
@@ -62,36 +43,20 @@ export default function AccountProfilePage() {
         setError(j.error || "Could not save profile.");
         return;
       }
+      await refreshUser();
       setSaved(true);
       setTimeout(() => setSaved(false), 3500);
+    } catch {
+      setError("Network error while saving profile.");
     } finally {
       setSaving(false);
     }
   }
 
-  if (loading) {
-    return <div className="py-16 text-center text-slate-400">Loading profile...</div>;
-  }
-
-  if (!user) {
-    return (
-      <div className="mx-auto max-w-md rounded-2xl border border-slate-800 bg-slate-900/60 p-8 text-center">
-        <p className="text-sm text-slate-300">
-          Please sign in to manage your {SITE_SETTINGS.brandPrefix} profile.
-        </p>
-        <Link
-          href="/sign-in"
-          className="mt-4 inline-block rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-semibold text-white"
-        >
-          Sign In
-        </Link>
-      </div>
-    );
-  }
+  if (!user) return null;
 
   return (
     <div className="space-y-6">
-      {/* Identity Card */}
       <div className="flex flex-wrap items-center gap-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -134,7 +99,6 @@ export default function AccountProfilePage() {
         </div>
       )}
 
-      {/* Editable Profile Form */}
       <form
         onSubmit={handleSave}
         className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6"
