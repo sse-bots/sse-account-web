@@ -110,29 +110,66 @@ export default function AccountProfilePage() {
       {/* Discord/GitHub-Style Profile Banner Card */}
       <section className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/70">
         {/* Accent Cover Strip */}
-        <div className="h-24 bg-gradient-to-br from-slate-900 via-[#101525] to-indigo-950/60" />
+        <div className="sse-profile-banner relative z-0 h-24 border-b border-slate-800/80 sm:h-28" />
 
-        <div className="px-6 pb-6">
-          <div className="-mt-11 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-            <div className="flex items-end gap-4">
-              {image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={image}
-                  alt={name}
-                  className="h-20 w-20 rounded-2xl border-4 border-[#0c0f17] object-cover shadow-xl"
-                />
+        <div className="relative z-10 px-5 pb-6 sm:px-6">
+          {/* Avatar + Desktop Roles Row */}
+          <div className="-mt-11 flex items-end justify-between gap-4 sm:-mt-12">
+            {image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={image}
+                alt={name}
+                className="h-20 w-20 shrink-0 rounded-2xl border-4 border-[#0c0f17] bg-slate-900 object-cover shadow-xl sm:h-24 sm:w-24"
+              />
+            ) : (
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border-4 border-[#0c0f17] bg-indigo-600 text-2xl font-extrabold text-white shadow-xl sm:h-24 sm:w-24">
+                <User className="h-9 w-9" />
+              </div>
+            )}
+
+            <div className="hidden flex-wrap items-center justify-end gap-2 pb-1 sm:flex">
+              {user.twoFactorEnabled ? (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-300">
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  2-Step Protected
+                </span>
               ) : (
-                <div className="flex h-20 w-20 items-center justify-center rounded-2xl border-4 border-[#0c0f17] bg-indigo-600 text-2xl font-extrabold text-white shadow-xl">
-                  <User className="h-9 w-9" />
-                </div>
+                <Link
+                  href="/account/security"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-300 hover:bg-amber-500/25"
+                >
+                  Enable 2-Step →
+                </Link>
               )}
 
-              <div className="pb-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-extrabold text-white sm:text-2xl">
-                    {name || user.name}
-                  </h2>
+              {(user.roleDetails && user.roleDetails.length > 0
+                ? user.roleDetails
+                : [{ slug: user.role || "member", name: user.role || "Member", color: "#10b981" }]
+              ).map((r) => (
+                <span
+                  key={r.slug}
+                  className="rounded-full px-3 py-1 text-xs font-bold"
+                  style={{
+                    backgroundColor: `${r.color}22`,
+                    color: r.color,
+                    border: `1px solid ${r.color}55`,
+                  }}
+                >
+                  {r.name}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Name, Pinned Badges & Email — cleanly below cover banner */}
+          <div className="mt-3.5 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="break-words text-xl font-extrabold text-white sm:text-2xl">
+                {name || user.name}
+              </h2>
+              {pinnedOrTopBadges.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
                   {pinnedOrTopBadges.map((b) => (
                     <span
                       key={b.slug}
@@ -148,14 +185,15 @@ export default function AccountProfilePage() {
                     </span>
                   ))}
                 </div>
-                <p className="text-xs text-slate-400">
-                  {user.username ? `@${user.username} · ` : ""}
-                  {email || user.email}
-                </p>
-              </div>
+              )}
             </div>
+            <p className="mt-1 truncate text-xs text-slate-400">
+              {user.username ? `@${user.username} · ` : ""}
+              {email || user.email}
+            </p>
 
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Mobile Roles & 2FA Pill */}
+            <div className="mt-3 flex flex-wrap items-center gap-2 sm:hidden">
               {user.twoFactorEnabled ? (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-300">
                   <ShieldCheck className="h-3.5 w-3.5" />
@@ -233,35 +271,35 @@ export default function AccountProfilePage() {
             )}
           </div>
 
-          {/* 3 Quick-Stat Tiles */}
-          <div className="mt-5 grid grid-cols-3 gap-3">
+          {/* 3 Quick-Stat Tiles (2-up + 1-wide on mobile so labels never overflow!) */}
+          <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
             <Link
               href="/account/security"
-              className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5 transition hover:border-indigo-500/60"
+              className="min-w-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5 transition hover:border-indigo-500/60"
             >
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <div className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 Security Score
               </div>
-              <div className="mt-1 flex items-baseline gap-1">
+              <div className="mt-1.5 flex items-baseline gap-1.5 whitespace-nowrap">
                 <span className="text-xl font-extrabold text-indigo-400">
                   {user.securityScore}%
                 </span>
-                <span className="hidden text-[11px] text-slate-400 sm:inline">
+                <span className="text-[11px] text-slate-400">
                   {user.twoFactorEnabled ? "Strong" : "Boost"}
                 </span>
               </div>
             </Link>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5">
+              <div className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 Badges Earned
               </div>
-              <div className="mt-1 flex items-center gap-1.5">
-                <Award className="h-4 w-4 text-amber-400" />
+              <div className="mt-1.5 flex items-center gap-1.5 whitespace-nowrap">
+                <Award className="h-4 w-4 shrink-0 text-amber-400" />
                 <span className="text-xl font-extrabold text-white">
                   {user.badges.length}
                 </span>
-                <span className="text-xs text-slate-500">
+                <span className="text-xs font-medium text-slate-500">
                   / {user.allBadges.length}
                 </span>
               </div>
@@ -269,16 +307,16 @@ export default function AccountProfilePage() {
 
             <Link
               href="/account/apps"
-              className="rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5 transition hover:border-indigo-500/60"
+              className="col-span-2 min-w-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5 transition hover:border-indigo-500/60 sm:col-span-1"
             >
-              <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <div className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 Connections
               </div>
-              <div className="mt-1 flex items-baseline gap-1.5">
+              <div className="mt-1.5 flex items-baseline gap-1.5 whitespace-nowrap">
                 <span className="text-xl font-extrabold text-emerald-400">
                   {user.linkedAccounts.length + connectedApps.length}
                 </span>
-                <span className="hidden text-[11px] text-slate-400 sm:inline">
+                <span className="text-[11px] text-slate-400">
                   Active
                 </span>
               </div>
