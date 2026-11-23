@@ -81,7 +81,12 @@ export default function AccountProfilePage() {
             </span>
             {user.discordId && (
               <span className="rounded-full bg-indigo-500/15 px-2.5 py-0.5 font-mono text-indigo-300">
-                Discord: {user.discordId}
+                Discord: {user.discordUsername ? `@${user.discordUsername}` : user.discordId}
+              </span>
+            )}
+            {user.githubId && (
+              <span className="rounded-full bg-slate-800 px-2.5 py-0.5 font-mono text-slate-200">
+                GitHub: {user.githubUsername ? `@${user.githubUsername}` : user.githubId}
               </span>
             )}
             {user.role !== "user" && (

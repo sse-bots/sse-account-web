@@ -30,7 +30,7 @@ export const SITE_SETTINGS = {
 
   /** Main hero & SEO description */
   description:
-    "Create one unified SSE profile to manage your email, password, Discord link, and sign in securely across SSE Nexus, SSE Tournaments, and every official SSE website.",
+    "Create one unified SSE profile to manage your email, password, Discord and GitHub links, and sign in securely across SSE Nexus, SSE Tournaments, and every official SSE website.",
 
   /** Support contact email displayed on Privacy & Terms pages */
   supportEmail: "support@sse-world.local",
@@ -54,6 +54,7 @@ export const SITE_SETTINGS = {
     enableEmailPassword: true,
     enablePublicSignUp: true,
     enableDiscordOAuth: true,
+    enableGitHubOAuth: true,
     /** Set true only after wiring an SMTP/Resend email sender in src/lib/auth.ts */
     requireEmailVerification: false,
     /** API timeout (ms) before GlobalNetworkMonitor redirects to /service-unavailable */
@@ -86,7 +87,8 @@ export const SITE_SETTINGS = {
     /** Human-readable descriptions shown on /oauth/consent */
     scopeLabels: {
       openid: "Verify your central SSE identity",
-      profile: "Read your display name, username, avatar, and linked Discord ID",
+      profile:
+        "Read your display name, username, avatar, and linked Discord / GitHub IDs",
       email: "Read your primary email address",
       offline_access: "Keep you signed in across sessions (refresh tokens)",
       "sse:servers": "Read your Discord servers via linked Discord account",
