@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 
 interface OtpCodeInputProps {
   value: string;
@@ -51,7 +51,6 @@ export function OtpCodeInput({
       return;
     }
 
-    // Handle multi-digit paste or fast autofill (e.g. from password manager)
     if (clean.length > 1) {
       const next = [...digits];
       for (let i = 0; i < clean.length && index + i < length; i++) {
@@ -72,7 +71,10 @@ export function OtpCodeInput({
     }
   }
 
-  function handleKeyDown(index: number, e: React.KeyboardEvent<HTMLInputElement>) {
+  function handleKeyDown(
+    index: number,
+    e: React.KeyboardEvent<HTMLInputElement>
+  ) {
     if (e.key === "Backspace") {
       if (digits[index]) {
         const next = [...digits];
@@ -94,7 +96,10 @@ export function OtpCodeInput({
 
   function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
     e.preventDefault();
-    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, length);
+    const pasted = e.clipboardData
+      .getData("text")
+      .replace(/\D/g, "")
+      .slice(0, length);
     if (!pasted) return;
     onChange(pasted);
     const focusIdx = Math.min(pasted.length, length - 1);
@@ -103,12 +108,12 @@ export function OtpCodeInput({
 
   return (
     <div
-      className={`flex items-center justify-center gap-2 sm:gap-2.5 ${
+      className={`mx-auto flex w-full max-w-[320px] items-center justify-center gap-1.5 sm:max-w-[380px] sm:gap-2.5 ${
         error ? "animate-otp-shake" : ""
       }`}
     >
       {digits.map((digit, idx) => (
-        <div key={idx} className="flex items-center">
+        <Fragment key={idx}>
           <input
             ref={(el) => {
               inputRefs.current[idx] = el;
@@ -124,22 +129,25 @@ export function OtpCodeInput({
             onPaste={handlePaste}
             onFocus={(e) => e.currentTarget.select()}
             aria-label={`Verification code digit ${idx + 1}`}
-            className={`h-13 w-11 rounded-2xl border-2 bg-slate-950 text-center font-mono text-xl font-extrabold text-white transition-all duration-150 focus:outline-none sm:h-14 sm:w-12 sm:text-2xl ${
+            className={`h-12 min-w-0 flex-1 max-w-[44px] rounded-xl border-2 bg-slate-950 p-0 text-center font-mono text-lg font-extrabold text-white transition-all duration-150 focus:outline-none sm:h-14 sm:max-w-[52px] sm:rounded-2xl sm:text-2xl ${
               digit ? "animate-otp-pop" : ""
             } ${
               error
-                ? "border-rose-500/80 shadow-[0_0_16px_rgba(244,63,94,0.28)]"
+                ? "border-rose-500/80 shadow-[0_0_12px_rgba(244,63,94,0.28)]"
                 : digit
-                  ? "border-indigo-500 shadow-[0_0_18px_var(--accent-glow)]"
-                  : "border-slate-800 focus:border-indigo-500 focus:shadow-[0_0_18px_var(--accent-glow)]"
+                  ? "border-indigo-500 shadow-[0_0_12px_var(--accent-glow)]"
+                  : "border-slate-800 focus:border-indigo-500 focus:shadow-[0_0_12px_var(--accent-glow)]"
             } disabled:opacity-50`}
           />
           {length === 6 && idx === 2 && (
-            <span className="ml-2 text-base font-bold text-slate-500 sm:ml-2.5">
+            <span
+              aria-hidden="true"
+              className="shrink-0 select-none px-0.5 text-sm font-bold text-slate-500 sm:px-1 sm:text-base"
+            >
               –
             </span>
           )}
-        </div>
+        </Fragment>
       ))}
     </div>
   );
