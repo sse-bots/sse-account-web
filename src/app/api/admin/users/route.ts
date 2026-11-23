@@ -23,6 +23,9 @@ export async function GET(req: Request) {
           { email: { $regex: q, $options: "i" } },
           { username: { $regex: q, $options: "i" } },
           { discordId: { $regex: q, $options: "i" } },
+          { discordUsername: { $regex: q, $options: "i" } },
+          { githubId: { $regex: q, $options: "i" } },
+          { githubUsername: { $regex: q, $options: "i" } },
         ],
       }
     : {};
@@ -43,6 +46,8 @@ export async function GET(req: Request) {
         image: u.image || null,
         discordId: u.discordId || null,
         discordUsername: u.discordUsername || null,
+        githubId: u.githubId || null,
+        githubUsername: u.githubUsername || null,
         role: resolveSseRole(
           typeof u.discordId === "string" ? u.discordId : null,
           typeof u.email === "string" ? u.email : null

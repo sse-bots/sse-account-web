@@ -11,12 +11,14 @@ import { SITE_SETTINGS } from "@/lib/site-settings";
 function SignUpInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
+  const { user, providers, loading: authLoading } = useAuth();
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState<"email" | "discord" | null>(null);
+  const [loading, setLoading] = useState<"email" | "discord" | "github" | null>(
+    null
+  );
   const [error, setError] = useState<string | null>(null);
 
   const hasOAuthFlow = Boolean(
@@ -63,18 +65,34 @@ function SignUpInner() {
     }
   }
 
-  async function handleDiscordSignUp() {
-    setLoading("discord");
+  async function handleSocialSignUp(provider: "discord" | "github") {
+    if (!providers[provider]) {
+      setError(
+        `${provider === "github" ? "GitHub" : "Discord"} sign-up is not configured yet.`
+      );
+      return;
+    }
+    setLoading(provider);
     setError(null);
     try {
-      const res = await signIn.social({ provider: "discord", callbackURL });
+      const origin = window.location.origin;
+      const res = await signIn.social({
+        provider,
+        callbackURL: callbackURL.startsWith("http")
+          ? callbackURL
+          : `${origin}${callbackURL}`,
+        errorCallbackURL: `${origin}/sign-up`,
+      });
       if (res?.error) {
-        setError(res.error.message || "Could not start Discord signup.");
+        setError(
+          res.error.message ||
+            `Could not start ${provider === "github" ? "GitHub" : "Discord"} signup.`
+        );
         setLoading(null);
       }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Could not start Discord signup."
+        err instanceof Error ? err.message : "Could not start social signup."
       );
       setLoading(null);
     }
@@ -99,8 +117,8 @@ function SignUpInner() {
             Create {SITE_SETTINGS.brandPrefix} Profile
           </h1>
           <p className="mt-1.5 text-xs text-slate-400">
-            One account for every {SITE_SETTINGS.brandPrefix} website. You can
-            link Discord anytime from your profile.
+            One account for every {SITE_SETTINGS.brandPrefix} website. Link
+            Discord or GitHub anytime from Security.
           </p>
         </div>
 
@@ -179,7 +197,8 @@ function SignUpInner() {
           </button>
         </form>
 
-        {SITE_SETTINGS.features.enableDiscordOAuth && (
+        {(SITE_SETTINGS.features.enableDiscordOAuth ||
+          SITE_SETTINGS.features.enableGitHubOAuth) && (
           <>
             <div className="my-5 flex items-center gap-3 text-[11px] text-slate-500">
               <div className="h-px flex-1 bg-slate-800" />
@@ -187,17 +206,35 @@ function SignUpInner() {
               <div className="h-px flex-1 bg-slate-800" />
             </div>
 
-            <button
-              type="button"
-              disabled={loading !== null}
-              onClick={handleDiscordSignUp}
-              className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#5865F2] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#4752C4] disabled:opacity-60"
-            >
-              {loading === "discord" && (
-                <Loader2 className="h-4 w-4 animate-spin" />
+            <div className="space-y-2.5">
+              {SITE_SETTINGS.features.enableDiscordOAuth && (
+                <button
+                  type="button"
+                  disabled={loading !== null}
+                  onClick={() => handleSocialSignUp("discord")}
+                  className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-[#5865F2] px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-[#4752C4] disabled:opacity-60"
+                >
+                  {loading === "discord" && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
+                  Sign up with Discord
+                </button>
               )}
-              Sign up with Discord
-            </button>
+
+              {SITE_SETTINGS.features.enableGitHubOAuth && (
+                <button
+                  type="button"
+                  disabled={loading !== null}
+                  onClick={() => handleSocialSignUp("github")}
+                  className="flex w-full items-center justify-center gap-2.5 rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-sm font-semibold text-white transition hover:border-indigo-500 hover:bg-slate-700 disabled:opacity-60"
+                >
+                  {loading === "github" && (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  )}
+                  Sign up with GitHub
+                </button>
+              )}
+            </div>
           </>
         )}
 

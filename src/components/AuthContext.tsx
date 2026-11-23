@@ -10,6 +10,13 @@ import {
 } from "react";
 import { usePathname } from "next/navigation";
 
+export interface LinkedAccountSummary {
+  id: string;
+  providerId: string;
+  accountId: string;
+  createdAt: string | null;
+}
+
 export interface AuthUser {
   userId: string;
   sessionId: string;
@@ -21,16 +28,25 @@ export interface AuthUser {
   image: string | null;
   discordId: string | null;
   discordUsername: string | null;
+  githubId: string | null;
+  githubUsername: string | null;
   hasPassword: boolean;
   linkedProviders: string[];
+  linkedAccounts: LinkedAccountSummary[];
   role: "owner" | "admin" | "user";
   isOwner: boolean;
   isAdmin: boolean;
   createdAt: string | null;
 }
 
+export interface ConfiguredProviders {
+  discord: boolean;
+  github: boolean;
+}
+
 interface AuthContextValue {
   user: AuthUser | null;
+  providers: ConfiguredProviders;
   loading: boolean;
   refreshUser: () => Promise<AuthUser | null>;
   clearUser: () => void;
@@ -41,6 +57,10 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [providers, setProviders] = useState<ConfiguredProviders>({
+    discord: true,
+    github: true,
+  });
   const [loading, setLoading] = useState(true);
   const inflightRef = useRef<Promise<AuthUser | null> | null>(null);
 
@@ -48,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     ok: boolean;
     authenticated: boolean;
     user: AuthUser | null;
+    providers?: ConfiguredProviders;
   }> => {
     const res = await fetch("/api/me", {
       method: "GET",
@@ -60,11 +81,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const data = (await res.json()) as {
       authenticated?: boolean;
       user?: AuthUser | null;
+      providers?: ConfiguredProviders;
     };
     return {
       ok: true,
       authenticated: Boolean(data.authenticated && data.user),
       user: data.authenticated && data.user ? data.user : null,
+      providers: data.providers,
     };
   }, []);
 
@@ -76,19 +99,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const promise = (async () => {
       try {
         let result = await fetchMeOnce();
-        // Retry once on transient 5xx / cold-start hiccup
         if (!result.ok) {
           await new Promise((r) => setTimeout(r, 450));
           result = await fetchMeOnce();
         }
-        // Only overwrite user state when the server explicitly returned 200 OK
+        if (result.providers) {
+          setProviders(result.providers);
+        }
         if (result.ok) {
           setUser(result.user);
           return result.user;
         }
         return null;
       } catch {
-        // Never wipe a valid logged-in session on a transient network error
         return null;
       } finally {
         setLoading(false);
@@ -105,12 +128,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
-  // Re-sync session on initial load & route transitions
   useEffect(() => {
     refreshUser();
   }, [pathname, refreshUser]);
 
-  // Re-sync when user returns to tab (e.g. after Discord OAuth or another tab sign-in)
   useEffect(() => {
     function onVisible() {
       if (document.visibilityState === "visible") {
@@ -122,7 +143,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshUser]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, refreshUser, clearUser }}>
+    <AuthContext.Provider
+      value={{ user, providers, loading, refreshUser, clearUser }}
+    >
       {children}
     </AuthContext.Provider>
   );

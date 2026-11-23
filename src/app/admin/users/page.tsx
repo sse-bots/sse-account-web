@@ -10,6 +10,9 @@ interface AdminUserRow {
   username: string | null;
   email: string;
   discordId: string | null;
+  discordUsername: string | null;
+  githubId: string | null;
+  githubUsername: string | null;
   role: string;
   createdAt: string | null;
 }
@@ -90,7 +93,8 @@ export default function AdminUsersPage() {
               <tr>
                 <th className="px-4 py-2.5">Name / Username</th>
                 <th className="px-4 py-2.5">Email</th>
-                <th className="px-4 py-2.5">Linked Discord ID</th>
+                <th className="px-4 py-2.5">Linked Discord</th>
+                <th className="px-4 py-2.5">Linked GitHub</th>
                 <th className="px-4 py-2.5">Role</th>
                 <th className="px-4 py-2.5">Joined</th>
               </tr>
@@ -108,7 +112,10 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="px-4 py-2.5 text-slate-300">{u.email}</td>
                   <td className="px-4 py-2.5 font-mono text-indigo-300">
-                    {u.discordId || "Not linked"}
+                    {u.discordUsername ? `@${u.discordUsername}` : u.discordId || "Not linked"}
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-slate-300">
+                    {u.githubUsername ? `@${u.githubUsername}` : u.githubId || "Not linked"}
                   </td>
                   <td className="px-4 py-2.5 uppercase text-slate-300">
                     {u.role}
