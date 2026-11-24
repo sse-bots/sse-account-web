@@ -161,8 +161,9 @@ export async function PATCH(req: Request) {
     updates.description = parsed.data.description;
   if (parsed.data.color !== undefined) updates.color = parsed.data.color;
 
-  if (!existing.isSystem) {
-    if (parsed.data.priority !== undefined) {
+  const isLockedSuperRole = slug === "admin" || slug === "head";
+  if (!isLockedSuperRole) {
+    if (!existing.isSystem && parsed.data.priority !== undefined) {
       updates.priority = Math.min(99, Math.max(1, parsed.data.priority));
     }
     if (parsed.data.permissions !== undefined) {
@@ -174,14 +175,6 @@ export async function PATCH(req: Request) {
         )
       );
     }
-  } else if (slug === "member" && parsed.data.permissions !== undefined) {
-    updates.permissions = Array.from(
-      new Set(
-        parsed.data.permissions
-          .map((p) => p.trim().toLowerCase())
-          .filter((p) => p && p !== "*")
-      )
-    );
   }
 
   await roles.updateOne({ slug }, { $set: updates });
@@ -205,9 +198,9 @@ export async function DELETE(req: Request) {
   if (!existing) {
     return NextResponse.json({ error: "Role not found." }, { status: 404 });
   }
-  if (existing.isSystem || slug === "admin" || slug === "member") {
+  if (existing.isSystem || slug === "head" || slug === "admin" || slug === "member") {
     return NextResponse.json(
-      { error: "Built-in system roles (admin, member) cannot be deleted." },
+      { error: "Built-in system roles cannot be deleted." },
       { status: 400 }
     );
   }

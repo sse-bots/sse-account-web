@@ -32,6 +32,7 @@ const updateProfileSchema = z.object({
     .or(z.literal("")),
   isPublicProfile: z.boolean().optional(),
   showPublicSocials: z.boolean().optional(),
+  showPublicBadges: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -56,7 +57,7 @@ export async function PATCH(req: Request) {
     );
   }
 
-  const { name, username, email, bio, image, isPublicProfile, showPublicSocials } = parsed.data;
+  const { name, username, email, bio, image, isPublicProfile, showPublicSocials, showPublicBadges } = parsed.data;
   const cleanEmail = email.toLowerCase();
   const cleanUsername = username ? username.toLowerCase() : null;
   const { users } = await getAuthCollections();
@@ -106,6 +107,7 @@ export async function PATCH(req: Request) {
         image: image || null,
         ...(isPublicProfile !== undefined ? { isPublicProfile } : {}),
         ...(showPublicSocials !== undefined ? { showPublicSocials } : {}),
+        ...(showPublicBadges !== undefined ? { showPublicBadges } : {}),
         updatedAt: new Date(),
       },
     }

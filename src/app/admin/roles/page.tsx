@@ -703,7 +703,7 @@ export default function AdminRolesPage() {
               </div>
             </div>
 
-            {editing.slug !== "admin" && (
+            {editing.slug !== "admin" && editing.slug !== "head" && (
               <div className="space-y-2">
                 <label className="block text-xs font-semibold text-slate-300">
                   Permissions

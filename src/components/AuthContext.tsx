@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { usePathname } from "next/navigation";
-import type { UserBadgeItem } from "@/lib/badges";
+import type { AccountVerification, UserBadgeItem } from "@/lib/badges";
 
 export interface LinkedAccountSummary {
   id: string;
@@ -27,6 +27,8 @@ export interface AuthUser {
   bio: string | null;
   isPublicProfile: boolean;
   showPublicSocials: boolean;
+  showPublicBadges: boolean;
+  verification: AccountVerification;
   email: string;
   emailVerified: boolean;
   image: string | null;
@@ -55,6 +57,7 @@ export interface AuthUser {
   isEnvAdmin: boolean;
   isOwner: boolean;
   isAdmin: boolean;
+  isHead: boolean;
   createdAt: string | null;
 }
 

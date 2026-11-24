@@ -8,7 +8,12 @@ import {
   userIdFilter,
 } from "./mongodb";
 import { RoleBadge, resolveUserRolesAndPermissions } from "./roles";
-import { UserBadgeItem, resolveUserBadges } from "./badges";
+import {
+  AccountVerification,
+  UserBadgeItem,
+  resolveAccountVerification,
+  resolveUserBadges,
+} from "./badges";
 
 export interface LinkedAccountSummary {
   id: string;
@@ -36,6 +41,8 @@ export interface AuthSessionContext {
   bio: string | null;
   isPublicProfile: boolean;
   showPublicSocials: boolean;
+  showPublicBadges: boolean;
+  verification: AccountVerification;
   email: string;
   emailVerified: boolean;
   image: string | null;
@@ -58,6 +65,7 @@ export interface AuthSessionContext {
   isEnvAdmin: boolean;
   isOwner: boolean;
   isAdmin: boolean;
+  isHead: boolean;
   createdAt: string | null;
 }
 
@@ -346,6 +354,7 @@ export async function getAuthSession(): Promise<AuthSessionContext | null> {
 
   const badgeState = await resolveUserBadges({
     storedBadges: userDoc?.badges,
+    badgeTiers: userDoc?.badgeTiers,
     pinnedBadges: userDoc?.pinnedBadges,
     twoFactorEnabled,
     emailVerified,
@@ -353,6 +362,8 @@ export async function getAuthSession(): Promise<AuthSessionContext | null> {
     githubLinked: Boolean(githubId),
     isAdmin: roleState.isAdmin,
   });
+
+  const verification = resolveAccountVerification(userDoc?.verification);
 
   // Compute live Security Score (0–100)
   let securityScore = 15; // base account
@@ -371,6 +382,8 @@ export async function getAuthSession(): Promise<AuthSessionContext | null> {
     bio: typeof userDoc?.bio === "string" ? userDoc.bio : null,
     isPublicProfile: userDoc?.isPublicProfile !== false,
     showPublicSocials: userDoc?.showPublicSocials !== false,
+    showPublicBadges: userDoc?.showPublicBadges !== false,
+    verification,
     email: resolvedEmail,
     emailVerified,
     image: (userDoc?.image as string | null) ?? session.user.image ?? null,
@@ -393,6 +406,7 @@ export async function getAuthSession(): Promise<AuthSessionContext | null> {
     isEnvAdmin: roleState.isEnvAdmin,
     isOwner: roleState.isOwner,
     isAdmin: roleState.isAdmin,
+    isHead: roleState.isHead,
     createdAt: userDoc?.createdAt
       ? new Date(userDoc.createdAt as string | Date).toISOString()
       : null,

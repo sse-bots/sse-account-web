@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getAuthSession } from "@/lib/session";
 import { getAuthCollections, serializeDoc, userDocMatch } from "@/lib/mongodb";
 import {
+  canVerifyUsers,
   hasPermission,
   listAllRoles,
   normalizeRoleSlug,
@@ -12,16 +13,32 @@ import {
 import {
   listAllBadges,
   normalizeBadgeSlug,
+  resolveAccountVerification,
   resolveUserBadges,
+  type BadgeTier,
 } from "@/lib/badges";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const verificationSchema = z.object({
+  isVerified: z.boolean(),
+  kind: z
+    .enum(["official", "head", "staff", "creator", "partner"])
+    .optional()
+    .default("official"),
+  label: z.string().trim().max(48).optional().nullable(),
+  note: z.string().trim().max(180).optional().nullable(),
+});
+
 const updateUserSchema = z.object({
   userId: z.string().min(1),
   roles: z.array(z.string().min(1)).optional(),
   badges: z.array(z.string().min(1)).optional(),
+  badgeTiers: z
+    .record(z.string(), z.number().int().min(1).max(4))
+    .optional(),
+  verification: verificationSchema.optional(),
 });
 
 export async function GET(req: Request) {
@@ -73,6 +90,7 @@ export async function GET(req: Request) {
 
       const badgeState = await resolveUserBadges({
         storedBadges: u.badges,
+        badgeTiers: u.badgeTiers,
         pinnedBadges: u.pinnedBadges,
         twoFactorEnabled: Boolean(u.twoFactorEnabled),
         emailVerified: Boolean(u.emailVerified),
@@ -80,6 +98,18 @@ export async function GET(req: Request) {
         githubLinked: Boolean(githubId),
         isAdmin: roleState.isAdmin,
       });
+
+      const badgeTiers: Record<string, BadgeTier> = {};
+      if (u.badgeTiers && typeof u.badgeTiers === "object") {
+        for (const [k, v] of Object.entries(
+          u.badgeTiers as Record<string, unknown>
+        )) {
+          const n = Number(v);
+          if (n === 1 || n === 2 || n === 3 || n === 4) {
+            badgeTiers[normalizeBadgeSlug(k)] = n;
+          }
+        }
+      }
 
       return serializeDoc({
         id: String(u.id || u._id),
@@ -92,11 +122,13 @@ export async function GET(req: Request) {
         githubId,
         githubUsername: u.githubUsername || null,
         twoFactorEnabled: Boolean(u.twoFactorEnabled),
+        verification: resolveAccountVerification(u.verification),
         role: roleState.primaryRole,
         roles: roleState.roles,
         roleDetails: roleState.roleDetails,
         badges: badgeState.earnedBadges,
         storedBadges: Array.isArray(u.badges) ? u.badges.map(String) : [],
+        badgeTiers,
         isEnvAdmin: roleState.isEnvAdmin,
         createdAt: u.createdAt || null,
       });
@@ -107,6 +139,7 @@ export async function GET(req: Request) {
     users: resolvedUsers,
     availableRoles,
     availableBadges,
+    canVerify: canVerifyUsers(ctx),
   });
 }
 
@@ -120,7 +153,7 @@ export async function PATCH(req: Request) {
   const parsed = updateUserSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: "Invalid update payload." },
+      { error: parsed.error.issues[0]?.message || "Invalid update payload." },
       { status: 400 }
     );
   }
@@ -160,6 +193,53 @@ export async function PATCH(req: Request) {
       )
     );
     updates.badges = cleanBadges;
+  }
+
+  if (parsed.data.badgeTiers !== undefined) {
+    const validBadgeSlugs = new Set(allBadges.map((b) => b.slug));
+    const cleanTiers: Record<string, number> = {};
+    for (const [rawSlug, tierVal] of Object.entries(parsed.data.badgeTiers)) {
+      const slug = normalizeBadgeSlug(rawSlug);
+      if (validBadgeSlugs.has(slug) && tierVal >= 2 && tierVal <= 4) {
+        cleanTiers[slug] = tierVal;
+      }
+    }
+    updates.badgeTiers = cleanTiers;
+  }
+
+  if (parsed.data.verification !== undefined) {
+    if (!canVerifyUsers(ctx)) {
+      return NextResponse.json(
+        {
+          error:
+            "Only SSE Admins and Heads can grant or revoke verification badges.",
+        },
+        { status: 403 }
+      );
+    }
+
+    const v = parsed.data.verification;
+    const prev = resolveAccountVerification(targetUser.verification);
+    updates.verification = v.isVerified
+      ? {
+          isVerified: true,
+          kind: v.kind || "official",
+          label: v.label ? v.label.trim() : null,
+          note: v.note ? v.note.trim() : null,
+          verifiedAt:
+            prev.isVerified && prev.verifiedAt
+              ? new Date(prev.verifiedAt)
+              : new Date(),
+          verifiedBy: ctx.userId,
+        }
+      : {
+          isVerified: false,
+          kind: "official",
+          label: null,
+          note: null,
+          verifiedAt: null,
+          verifiedBy: null,
+        };
   }
 
   await users.updateOne({ _id: targetUser._id }, { $set: updates });

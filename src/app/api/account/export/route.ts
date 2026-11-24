@@ -28,6 +28,7 @@ export async function GET() {
     },
     connections: ctx.linkedAccounts,
     connectedApps,
+    verification: ctx.verification,
     roles: ctx.roles,
     permissions: ctx.permissions,
     badges: ctx.badges,
