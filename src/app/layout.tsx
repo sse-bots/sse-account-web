@@ -1,9 +1,16 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthContext";
 import { AppShell } from "@/components/AppShell";
 import { GlobalNetworkMonitor } from "@/components/GlobalNetworkMonitor";
 import { SITE_SETTINGS } from "@/lib/site-settings";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#070b14",
+};
 
 export const metadata: Metadata = {
   title: `${SITE_SETTINGS.siteName} — ${SITE_SETTINGS.tagline}`,

@@ -463,7 +463,7 @@ function SecurityPageInner() {
   return (
     <div className="space-y-6">
       {/* Live Security Health Score Card */}
-      <section className="flex flex-col justify-between gap-5 rounded-3xl border border-slate-800 bg-slate-900/60 p-6 sm:flex-row sm:items-center">
+      <section className="flex flex-col justify-between gap-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4 sm:flex-row sm:items-center sm:gap-5 sm:p-6">
         <div className="flex items-center gap-5">
           <div className="relative flex h-20 w-20 shrink-0 items-center justify-center">
             <svg className="h-20 w-20 -rotate-90" viewBox="0 0 72 72">
@@ -651,7 +651,7 @@ function SecurityPageInner() {
       {/* Connected Social Accounts (Discord + GitHub) */}
       {(SITE_SETTINGS.features.enableDiscordOAuth ||
         SITE_SETTINGS.features.enableGitHubOAuth) && (
-        <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
+        <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4 sm:p-6">
           <div>
             <div className="flex items-center gap-2">
               <Link2 className="h-4 w-4 text-indigo-400" />
@@ -825,7 +825,7 @@ function SecurityPageInner() {
       {user.hasPassword ? (
         <form
           onSubmit={handlePasswordUpdate}
-          className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6"
+          className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4 sm:p-6"
         >
           <div className="flex items-center gap-2">
             <KeyRound className="h-4 w-4 text-indigo-400" />
@@ -893,7 +893,7 @@ function SecurityPageInner() {
       ) : (
         <form
           onSubmit={handleSetInitialPassword}
-          className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6"
+          className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4 sm:p-6"
         >
           <div>
             <div className="flex items-center gap-2">
@@ -960,7 +960,7 @@ function SecurityPageInner() {
       )}
 
       {/* Active Sessions */}
-      <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
+      <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Monitor className="h-4 w-4 text-indigo-400" />
@@ -1003,7 +1003,7 @@ function SecurityPageInner() {
                       </span>
                     )}
                   </div>
-                  <div className="font-mono text-[11px] text-slate-500">
+                  <div className="break-all font-mono text-[11px] text-slate-500">
                     IP: {s.ipAddress} · Started{" "}
                     {s.createdAt ? new Date(s.createdAt).toLocaleString() : "-"}
                   </div>
@@ -1026,7 +1026,7 @@ function SecurityPageInner() {
       </section>
 
       {/* Recent Security Activity Feed */}
-      <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
+      <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4 sm:p-6">
         <div className="flex items-center gap-2">
           <Activity className="h-4 w-4 text-indigo-400" />
           <h2 className="text-base font-bold text-white">

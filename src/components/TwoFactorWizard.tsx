@@ -226,7 +226,7 @@ export function TwoFactorWizard({
   }
 
   return (
-    <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-[#101525] to-indigo-950/60 p-6">
+    <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-900 via-[#101525] to-indigo-950/60 p-4 sm:p-6">
       {/* Header Row */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
         <div className="flex items-start gap-4">
@@ -524,7 +524,7 @@ export function TwoFactorWizard({
                     <img
                       src={qrDataUrl}
                       alt="2FA QR Code"
-                      className="h-44 w-44"
+                      className="h-40 w-40 sm:h-44 sm:w-44"
                     />
                   ) : (
                     <div className="flex h-44 w-44 items-center justify-center text-xs text-slate-500">
@@ -651,7 +651,7 @@ export function TwoFactorWizard({
       {/* Modal: Regenerate Backup Codes OR Disable 2FA */}
       {modalMode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-          <div className="animate-sheet-up w-full max-w-md space-y-4 rounded-3xl border border-slate-700 bg-[#0b1120] p-6 shadow-2xl">
+          <div className="animate-sheet-up max-h-[90dvh] w-full max-w-md space-y-4 overflow-y-auto rounded-3xl border border-slate-700 bg-[#0b1120] p-5 shadow-2xl sm:p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white">
                 {modalMode === "disable"

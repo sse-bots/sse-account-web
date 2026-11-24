@@ -42,6 +42,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user, loading: authLoading, clearUser } = useAuth();
   const [dockOpen, setDockOpen] = useState(false);
+  const isFocusedAuthFlow =
+    pathname.startsWith("/oauth/consent") ||
+    pathname.startsWith("/two-factor") ||
+    pathname.startsWith("/forgot-password");
   const [quickFilter, setQuickFilter] = useState("");
   const [theme, setTheme] = useState<ThemeState>({
     ...DEFAULT_THEME_STATE,
@@ -197,7 +201,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-slate-100 lg:flex">
+    <div className="min-h-screen w-full overflow-x-clip bg-[#07090e] text-slate-100 lg:flex">
       {/* Desktop Fixed Left Sidebar */}
       <aside className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-64 lg:flex-col lg:border-r lg:border-slate-800/80 lg:bg-[#0a0d14]">
         <div className="flex h-16 items-center justify-between border-b border-slate-800/80 px-4">
@@ -332,51 +336,58 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main Content + Mobile Top Header */}
-      <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-800/80 bg-[#0a0d14]/85 px-4 backdrop-blur-md lg:hidden">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-[11px] font-extrabold text-white shadow-md shadow-indigo-500/25">
-              {SITE_SETTINGS.shortName}
-            </div>
-            <div className="leading-tight">
-              <div className="text-sm font-extrabold tracking-tight text-white">
-                {SITE_SETTINGS.siteName}
-              </div>
-              <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                <span
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{ backgroundColor: activePrimaryColor.c500 }}
-                />
-                <span>{user ? user.name : activePresetLabel}</span>
-              </div>
-            </div>
-          </Link>
-
-          <div className="flex items-center gap-2">
-            <ThemeCustomizer theme={theme} onChange={updateTheme} align="right" />
-
-            <button
-              type="button"
-              onClick={() =>
-                updateTheme({
-                  ...theme,
-                  mode: theme.mode === "light" ? "dark" : "light",
-                })
-              }
-              aria-label="Toggle Dark or Light Mode"
-              className="rounded-xl border border-slate-800 bg-slate-900/90 p-2 text-slate-200 transition hover:border-indigo-500 active:scale-95"
-            >
-              {theme.mode === "light" ? (
-                <Moon className="h-4 w-4 text-indigo-400" />
-              ) : (
-                <Sun className="h-4 w-4 text-amber-400" />
-              )}
-            </button>
+      {/* Fixed Mobile Top Header (stays pinned inside mobile browsers & SSE Vault Android APK) */}
+      <header className="sse-mobile-header flex items-center justify-between gap-2 border-b border-slate-800/80 bg-[#0a0d14]/90 backdrop-blur-md lg:hidden">
+        <Link href="/" className="flex min-w-0 items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-[11px] font-extrabold text-white shadow-md shadow-indigo-500/25">
+            {SITE_SETTINGS.shortName}
           </div>
-        </header>
+          <div className="min-w-0 leading-tight">
+            <div className="truncate text-sm font-extrabold tracking-tight text-white">
+              {SITE_SETTINGS.siteName}
+            </div>
+            <div className="flex items-center gap-1 text-[10px] text-slate-400">
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: activePrimaryColor.c500 }}
+              />
+              <span className="truncate">
+                {user ? user.name : activePresetLabel}
+              </span>
+            </div>
+          </div>
+        </Link>
 
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-14 lg:pt-8">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+          <ThemeCustomizer theme={theme} onChange={updateTheme} align="right" />
+
+          <button
+            type="button"
+            onClick={() =>
+              updateTheme({
+                ...theme,
+                mode: theme.mode === "light" ? "dark" : "light",
+              })
+            }
+            aria-label="Toggle Dark or Light Mode"
+            className="rounded-xl border border-slate-800 bg-slate-900/90 p-2 text-slate-200 transition hover:border-indigo-500 active:scale-95"
+          >
+            {theme.mode === "light" ? (
+              <Moon className="h-4 w-4 text-indigo-400" />
+            ) : (
+              <Sun className="h-4 w-4 text-amber-400" />
+            )}
+          </button>
+        </div>
+      </header>
+
+      {/* Main Content Wrapper (cleanly offset below fixed mobile header) */}
+      <div className="sse-main-shell flex min-w-0 flex-1 flex-col lg:pl-64">
+        <main
+          className={`mx-auto w-full max-w-5xl flex-1 pt-5 sm:px-6 lg:px-8 lg:pt-8 ${
+            isFocusedAuthFlow ? "sse-main-content-compact" : "sse-main-content"
+          }`}
+        >
           {children}
         </main>
       </div>
@@ -389,7 +400,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => setDockOpen(false)}
             aria-hidden="true"
           />
-          <div className="animate-sheet-up max-h-[86vh] overflow-y-auto rounded-t-3xl border-t border-slate-800 bg-[#0b0e16] px-4 pb-24 pt-4 shadow-2xl">
+          <div className="animate-sheet-up sse-mobile-sheet overflow-y-auto rounded-t-3xl border-t border-slate-800 bg-[#0b0e16] pt-4 shadow-2xl">
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-700" />
 
             <div className="mb-3 flex items-center justify-between gap-2 rounded-2xl border border-slate-800 bg-slate-950/70 px-3.5 py-2.5">
@@ -539,8 +550,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      {/* Mobile Floating Dock */}
-      <div className="fixed bottom-4 left-1/2 z-[60] -translate-x-1/2 lg:hidden">
+      {/* Mobile Floating Dock (hidden on focused OAuth/2FA screens so buttons stay unobstructed) */}
+      {!isFocusedAuthFlow && (
+      <div className="sse-mobile-dock fixed left-1/2 z-[60] -translate-x-1/2 lg:hidden">
         <div className="flex items-center rounded-2xl border border-slate-700/80 bg-[#111520]/95 p-1.5 shadow-[0_10px_35px_rgba(0,0,0,0.65)] backdrop-blur-md">
           {dockOpen ? (
             <div className="flex items-center gap-2 px-2">
@@ -586,6 +598,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
         </div>
       </div>
+      )}
     </div>
   );
 }

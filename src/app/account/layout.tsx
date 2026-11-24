@@ -66,7 +66,7 @@ export default function AccountLayout({
         </p>
       </div>
 
-      <nav className="flex items-center gap-2 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-1.5">
+      <nav className="no-scrollbar flex items-center gap-1.5 overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/70 p-1.5 sm:gap-2">
         {ACCOUNT_TABS.map((t) => {
           const Icon = t.icon;
           const active = t.exact
@@ -76,7 +76,7 @@ export default function AccountLayout({
             <Link
               key={t.href}
               href={t.href}
-              className={`inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold whitespace-nowrap transition sm:gap-2 sm:px-4 ${
                 active
                   ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/25"
                   : "text-slate-300 hover:bg-slate-800 hover:text-white"

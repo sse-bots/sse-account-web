@@ -68,8 +68,8 @@ function ConsentInner() {
   }
 
   return (
-    <div className="mx-auto mt-12 max-w-lg">
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-8 shadow-2xl">
+    <div className="mx-auto mt-3 max-w-lg sm:mt-12">
+      <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5 shadow-2xl sm:p-8">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-500/20 text-indigo-400">
             <Globe className="h-6 w-6" />
@@ -78,7 +78,7 @@ function ConsentInner() {
             <p className="text-xs font-semibold uppercase tracking-wider text-indigo-400">
               {SITE_SETTINGS.siteName}
             </p>
-            <h1 className="text-xl font-bold text-white">
+            <h1 className="break-words text-lg font-bold text-white sm:text-xl">
               Authorize {clientName}
             </h1>
           </div>
@@ -112,7 +112,7 @@ function ConsentInner() {
           </div>
         )}
 
-        <div className="mt-6 grid grid-cols-2 gap-3">
+        <div className="mt-6 grid grid-cols-1 gap-2.5 min-[360px]:grid-cols-2 sm:gap-3">
           <button
             type="button"
             disabled={submitting !== null}

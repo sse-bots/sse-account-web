@@ -150,8 +150,8 @@ function TwoFactorChallengeInner() {
   const strokeDashoffset = circumference * (1 - totpSeconds / 30);
 
   return (
-    <div className="mx-auto mt-6 max-w-md sm:mt-10">
-      <div className="relative overflow-hidden rounded-3xl border border-indigo-500/35 bg-gradient-to-br from-slate-900 via-[#101525] to-indigo-950/60 p-7 shadow-2xl sm:p-8">
+    <div className="mx-auto mt-2 max-w-md sm:mt-10">
+      <div className="relative overflow-hidden rounded-3xl border border-indigo-500/35 bg-gradient-to-br from-slate-900 via-[#101525] to-indigo-950/60 p-5 shadow-2xl sm:p-8">
         {/* Vault Shield Hero */}
         <div className="mb-6 flex flex-col items-center text-center">
           <div className="animate-vault-float mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-xl shadow-indigo-500/25">
@@ -185,7 +185,7 @@ function TwoFactorChallengeInner() {
                 key={t.id}
                 type="button"
                 onClick={() => switchMethod(t.id)}
-                className={`flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-bold transition ${
+                className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-2 text-[10px] font-bold transition sm:px-2 sm:text-[11px] ${
                   active
                     ? "bg-indigo-600 text-white shadow-md shadow-indigo-600/25"
                     : "text-slate-400 hover:bg-slate-900 hover:text-white"
