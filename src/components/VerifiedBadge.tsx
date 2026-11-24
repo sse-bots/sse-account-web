@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
-import { VERIFICATION_KINDS, type AccountVerification } from "@/lib/badges";
+import {
+  VERIFICATION_KINDS,
+  type AccountVerification,
+} from "@/lib/badge-constants";
 
 export interface VerifiedBadgeProps {
   verification?: AccountVerification | null;
