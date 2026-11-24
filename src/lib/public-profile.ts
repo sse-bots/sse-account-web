@@ -1,7 +1,12 @@
 import type { Document } from "mongodb";
 import { getAuthCollections, userIdFilter } from "./mongodb";
 import { RoleBadge, resolveUserRolesAndPermissions } from "./roles";
-import { UserBadgeItem, resolveUserBadges } from "./badges";
+import {
+  AccountVerification,
+  UserBadgeItem,
+  resolveAccountVerification,
+  resolveUserBadges,
+} from "./badges";
 
 export interface PublicUserProfile {
   name: string;
@@ -10,9 +15,12 @@ export interface PublicUserProfile {
   image: string | null;
   emailVerified: boolean;
   twoFactorEnabled: boolean;
+  showPublicBadges: boolean;
+  verification: AccountVerification;
   role: string;
   roleDetails: RoleBadge[];
   badges: UserBadgeItem[];
+  allBadges: UserBadgeItem[];
   totalBadgesCatalog: number;
   socials: {
     discord: { username: string | null; id: string } | null;
@@ -116,6 +124,7 @@ export async function getPublicProfileByUsername(
 
   const badgeState = await resolveUserBadges({
     storedBadges: userDoc.badges,
+    badgeTiers: userDoc.badgeTiers,
     pinnedBadges: userDoc.pinnedBadges,
     twoFactorEnabled,
     emailVerified,
@@ -125,6 +134,8 @@ export async function getPublicProfileByUsername(
   });
 
   const showPublicSocials = userDoc.showPublicSocials !== false;
+  const showPublicBadges = userDoc.showPublicBadges !== false;
+  const verification = resolveAccountVerification(userDoc.verification);
 
   return {
     status: "ok",
@@ -135,9 +146,12 @@ export async function getPublicProfileByUsername(
       image: typeof userDoc.image === "string" && userDoc.image.trim() ? userDoc.image : null,
       emailVerified,
       twoFactorEnabled,
+      showPublicBadges,
+      verification,
       role: roleState.primaryRole,
       roleDetails: roleState.roleDetails,
       badges: badgeState.earnedBadges,
+      allBadges: badgeState.allBadges,
       totalBadgesCatalog: badgeState.allBadges.length,
       socials: {
         discord:

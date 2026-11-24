@@ -28,6 +28,7 @@ import { signOut } from "@/lib/auth-client";
 import { useAuth } from "@/components/AuthContext";
 import { SITE_SETTINGS } from "@/lib/site-settings";
 import { ThemeCustomizer } from "@/components/ThemeCustomizer";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import {
   DEFAULT_THEME_STATE,
   PRIMARY_COLORS,
@@ -111,6 +112,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href: "/account",
             label: `${SITE_SETTINGS.brandPrefix} Profile`,
             icon: User,
+          },
+          {
+            href: "/account/badges",
+            label: "Badges",
+            icon: Award,
           },
           {
             href: "/account/security",
@@ -307,8 +313,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
                 <div className="min-w-0">
-                  <div className="truncate text-xs font-semibold text-white">
-                    {user.name}
+                  <div className="flex items-center gap-1 text-xs font-semibold text-white">
+                    <span className="truncate">{user.name}</span>
+                    <VerifiedBadge
+                      verification={user.verification}
+                      accountName={user.name}
+                      size="sm"
+                      interactive={false}
+                    />
                   </div>
                   <div className="truncate text-[10px] text-slate-400">
                     {user.email}

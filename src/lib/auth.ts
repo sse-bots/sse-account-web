@@ -13,7 +13,7 @@ import {
 } from "./mongodb";
 import { SITE_SETTINGS } from "./site-settings";
 import { isEnvAdminMatch, resolveUserRolesAndPermissions } from "./roles";
-import { resolveUserBadges } from "./badges";
+import { resolveAccountVerification, resolveUserBadges } from "./badges";
 import { sendOtpEmail } from "./mailer";
 
 function normalizeOrigin(url?: string | null): string | null {
@@ -89,7 +89,9 @@ async function resolveOidcClaims(user: Record<string, unknown>) {
   let twoFactorEnabled = Boolean(user.twoFactorEnabled);
   let storedRoles: unknown = user.roles;
   let storedBadges: unknown = user.badges;
+  let badgeTiers: unknown = user.badgeTiers;
   let pinnedBadges: unknown = user.pinnedBadges;
+  let rawVerification: unknown = user.verification;
 
   if (userId) {
     try {
@@ -110,7 +112,9 @@ async function resolveOidcClaims(user: Record<string, unknown>) {
         twoFactorEnabled = Boolean(freshDoc.twoFactorEnabled);
         storedRoles = freshDoc.roles;
         storedBadges = freshDoc.badges;
+        badgeTiers = freshDoc.badgeTiers;
         pinnedBadges = freshDoc.pinnedBadges;
+        rawVerification = freshDoc.verification;
       }
     } catch {
       // fall back to session fields
@@ -125,6 +129,7 @@ async function resolveOidcClaims(user: Record<string, unknown>) {
 
   const badgeState = await resolveUserBadges({
     storedBadges,
+    badgeTiers,
     pinnedBadges,
     twoFactorEnabled,
     emailVerified,
@@ -132,6 +137,8 @@ async function resolveOidcClaims(user: Record<string, unknown>) {
     githubLinked: Boolean(githubId),
     isAdmin: roleState.isAdmin,
   });
+
+  const verification = resolveAccountVerification(rawVerification);
 
   return {
     username,
@@ -143,6 +150,8 @@ async function resolveOidcClaims(user: Record<string, unknown>) {
     sse_roles: roleState.roles,
     sse_permissions: roleState.permissions,
     sse_badges: badgeState.badgeSlugs,
+    sse_verified: verification.isVerified,
+    sse_verification: verification,
     two_factor_enabled: twoFactorEnabled,
   };
 }
@@ -396,6 +405,7 @@ export const auth = betterAuth({
           sse_roles: claims.sse_roles,
           sse_permissions: claims.sse_permissions,
           sse_badges: claims.sse_badges,
+          sse_verified: claims.sse_verified,
           two_factor_enabled: claims.two_factor_enabled,
         };
       },

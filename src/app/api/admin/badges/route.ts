@@ -13,11 +13,23 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const optionalImageUrlSchema = z
+  .string()
+  .trim()
+  .refine(
+    (v) => v === "" || /^https?:\/\/.+/i.test(v),
+    "Artwork URL must start with http:// or https://"
+  )
+  .optional()
+  .nullable();
+
 const createBadgeSchema = z.object({
   name: z.string().trim().min(2).max(40),
   slug: z.string().trim().min(2).max(40).optional(),
   description: z.string().trim().max(180).optional().default(""),
+  howToEarn: z.string().trim().max(200).optional().default(""),
   icon: z.string().trim().min(1).max(32).optional().default("award"),
+  imageUrl: optionalImageUrlSchema,
   color: z
     .string()
     .trim()
@@ -28,19 +40,25 @@ const createBadgeSchema = z.object({
     .enum(["common", "rare", "epic", "legendary", "staff"])
     .optional()
     .default("rare"),
+  category: z.enum(["achievement", "highlight"]).optional().default("achievement"),
+  isLegacy: z.boolean().optional().default(false),
 });
 
 const patchBadgeSchema = z.object({
   slug: z.string().trim().min(1),
   name: z.string().trim().min(2).max(40).optional(),
   description: z.string().trim().max(180).optional(),
+  howToEarn: z.string().trim().max(200).optional(),
   icon: z.string().trim().min(1).max(32).optional(),
+  imageUrl: optionalImageUrlSchema,
   color: z
     .string()
     .trim()
     .regex(/^#[0-9a-fA-F]{6}$/)
     .optional(),
   rarity: z.enum(["common", "rare", "epic", "legendary", "staff"]).optional(),
+  category: z.enum(["achievement", "highlight"]).optional(),
+  isLegacy: z.boolean().optional(),
 });
 
 export async function GET() {
@@ -91,11 +109,15 @@ export async function POST(req: Request) {
     slug,
     name: parsed.data.name,
     description: parsed.data.description,
+    howToEarn: parsed.data.howToEarn || "Awarded by SSE Admins.",
     icon: parsed.data.icon,
+    imageUrl: parsed.data.imageUrl ? parsed.data.imageUrl : null,
     color: parsed.data.color,
     rarity: parsed.data.rarity,
+    category: parsed.data.category,
     isAuto: false,
     isSystem: false,
+    isLegacy: Boolean(parsed.data.isLegacy),
     createdAt: now,
     updatedAt: now,
   });
@@ -112,7 +134,10 @@ export async function PATCH(req: Request) {
   const body = await req.json().catch(() => null);
   const parsed = patchBadgeSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid badge update." }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message || "Invalid badge update." },
+      { status: 400 }
+    );
   }
 
   const { badges } = await getAuthCollections();
@@ -126,9 +151,15 @@ export async function PATCH(req: Request) {
   if (parsed.data.name !== undefined) updates.name = parsed.data.name;
   if (parsed.data.description !== undefined)
     updates.description = parsed.data.description;
+  if (parsed.data.howToEarn !== undefined)
+    updates.howToEarn = parsed.data.howToEarn;
   if (parsed.data.icon !== undefined) updates.icon = parsed.data.icon;
+  if (parsed.data.imageUrl !== undefined)
+    updates.imageUrl = parsed.data.imageUrl ? parsed.data.imageUrl : null;
   if (parsed.data.color !== undefined) updates.color = parsed.data.color;
   if (parsed.data.rarity !== undefined) updates.rarity = parsed.data.rarity;
+  if (parsed.data.category !== undefined) updates.category = parsed.data.category;
+  if (parsed.data.isLegacy !== undefined) updates.isLegacy = parsed.data.isLegacy;
 
   await badges.updateOne({ slug }, { $set: updates });
   return NextResponse.json({ ok: true });

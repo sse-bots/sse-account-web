@@ -29,6 +29,7 @@ export interface ResolvedRoleState {
   isEnvAdmin: boolean;
   isOwner: boolean;
   isAdmin: boolean;
+  isHead: boolean;
 }
 
 export const AVAILABLE_PERMISSIONS: Array<{
@@ -52,7 +53,14 @@ export const AVAILABLE_PERMISSIONS: Array<{
   {
     key: "users:manage",
     label: "Manage Users",
-    description: "Search registered SSE profiles and assign/remove roles.",
+    description: "Search registered SSE profiles and assign/remove roles and badges.",
+    group: "Accounts",
+  },
+  {
+    key: "users:verify",
+    label: "Verify Accounts",
+    description:
+      "Grant or revoke the Meta-style Verified badge beside user profile names (Admins & Heads).",
     group: "Accounts",
   },
   {
@@ -97,13 +105,63 @@ export const SYSTEM_DEFAULT_ROLES: Array<
   Omit<RoleDefinition, "id" | "createdAt" | "updatedAt">
 > = [
   {
+    slug: "head",
+    name: "Head",
+    description:
+      "SSE Leadership & Head Administrator with full platform authority, roles, badges, and account verification control.",
+    color: "#f43f5e",
+    priority: 120,
+    permissions: ["*"],
+    isSystem: true,
+  },
+  {
     slug: "admin",
     name: "Admin",
     description:
-      "Full administrative access across SSE Accounts, custom roles, OAuth apps, and connected SSE websites.",
+      "Full administrative access across SSE Accounts, custom roles, OAuth apps, verification, and connected SSE websites.",
     color: "#f59e0b",
     priority: 100,
     permissions: ["*"],
+    isSystem: true,
+  },
+  {
+    slug: "moderator",
+    name: "Moderator",
+    description:
+      "Moderates SSE community spaces and reviews bot activation requests in SSE Nexus.",
+    color: "#3b82f6",
+    priority: 70,
+    permissions: ["nexus:staff", "profile:edit"],
+    isSystem: true,
+  },
+  {
+    slug: "core_developer",
+    name: "Core Developer",
+    description:
+      "Builds and maintains SSE bots, web dashboards, and OAuth integrations.",
+    color: "#a855f7",
+    priority: 65,
+    permissions: ["developer:access", "profile:edit"],
+    isSystem: true,
+  },
+  {
+    slug: "tournament_manager",
+    name: "Tournament Manager",
+    description:
+      "Hosts and manages official SSE Tournament events, brackets, and matches.",
+    color: "#f97316",
+    priority: 55,
+    permissions: ["tournaments:manage", "profile:edit"],
+    isSystem: true,
+  },
+  {
+    slug: "vip_supporter",
+    name: "VIP Supporter",
+    description:
+      "Recognised partner or long-term supporter across SSE World.",
+    color: "#ec4899",
+    priority: 30,
+    permissions: ["profile:edit"],
     isSystem: true,
   },
   {
@@ -157,7 +215,6 @@ export function isEnvOwnerDiscordId(
   if (ownerDiscordIds.size > 0) {
     return ownerDiscordIds.has(String(discordId).trim());
   }
-  // If OWNER_DISCORD_ID isn't set separately, treat ADMIN_DISCORD_ID as owner-level admin too
   return adminDiscordIds.has(String(discordId).trim());
 }
 
@@ -265,6 +322,9 @@ export async function resolveUserRolesAndPermissions(input: {
     }
   }
 
+  if (envOwner) {
+    assigned.add("head");
+  }
   if (envAdmin) {
     assigned.add("admin");
   }
@@ -290,15 +350,19 @@ export async function resolveUserRolesAndPermissions(input: {
     }
   }
 
+  const isHead = envOwner || assigned.has("head");
   const isAdmin =
+    isHead ||
     envAdmin ||
     assigned.has("admin") ||
     permSet.has("*") ||
     permSet.has("accounts:admin");
 
-  const primaryRole = isAdmin
-    ? "admin"
-    : roleDetails.find((r) => r.slug !== "member")?.slug || "member";
+  const primaryRole = isHead
+    ? "head"
+    : isAdmin
+      ? "admin"
+      : roleDetails.find((r) => r.slug !== "member")?.slug || "member";
 
   return {
     primaryRole,
@@ -308,6 +372,7 @@ export async function resolveUserRolesAndPermissions(input: {
     isEnvAdmin: envAdmin,
     isOwner: envOwner,
     isAdmin,
+    isHead,
   };
 }
 
@@ -332,4 +397,23 @@ export function hasPermission(
   if (user.isOwner || user.isAdmin) return true;
   if (!Array.isArray(user.permissions)) return false;
   return user.permissions.includes("*") || user.permissions.includes(permission);
+}
+
+export function canVerifyUsers(
+  user:
+    | {
+        roles?: string[];
+        role?: string;
+        permissions?: string[];
+        isAdmin?: boolean;
+        isOwner?: boolean;
+        isHead?: boolean;
+      }
+    | null
+    | undefined
+): boolean {
+  if (!user) return false;
+  if (user.isOwner || user.isHead || user.isAdmin) return true;
+  if (hasRole(user, "head") || hasRole(user, "admin")) return true;
+  return hasPermission(user, "users:verify");
 }

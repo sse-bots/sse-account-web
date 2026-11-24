@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Globe, KeyRound, LogIn, User } from "lucide-react";
+import { Award, Globe, KeyRound, LogIn, User } from "lucide-react";
 import { useAuth } from "@/components/AuthContext";
 import { SITE_SETTINGS } from "@/lib/site-settings";
 
 const ACCOUNT_TABS = [
   { href: "/account", label: "Profile Details", icon: User, exact: true },
+  { href: "/account/badges", label: "Badges", icon: Award, exact: false },
   {
     href: "/account/security",
     label: "Security & Links",

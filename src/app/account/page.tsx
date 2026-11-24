@@ -13,9 +13,8 @@ import {
   User,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthContext";
-import { BadgeIcon } from "@/components/BadgeIcon";
-import { BadgeShowcase } from "@/components/BadgeShowcase";
 import { CopyButton } from "@/components/CopyButton";
+import { VerifiedBadge } from "@/components/VerifiedBadge";
 import { SITE_SETTINGS } from "@/lib/site-settings";
 
 interface ConnectedAppRow {
@@ -42,6 +41,7 @@ export default function AccountProfilePage() {
   const [image, setImage] = useState("");
   const [isPublicProfile, setIsPublicProfile] = useState(true);
   const [showPublicSocials, setShowPublicSocials] = useState(true);
+  const [showPublicBadges, setShowPublicBadges] = useState(true);
   const [origin, setOrigin] = useState("");
 
   useEffect(() => {
@@ -53,6 +53,7 @@ export default function AccountProfilePage() {
     setImage(user.image || "");
     setIsPublicProfile(user.isPublicProfile !== false);
     setShowPublicSocials(user.showPublicSocials !== false);
+    setShowPublicBadges(user.showPublicBadges !== false);
     if (typeof window !== "undefined") setOrigin(window.location.origin);
 
     fetch("/api/account/consents", {
@@ -76,7 +77,7 @@ export default function AccountProfilePage() {
         method: "PATCH",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, username, email, bio, image, isPublicProfile, showPublicSocials }),
+        body: JSON.stringify({ name, username, email, bio, image, isPublicProfile, showPublicSocials, showPublicBadges }),
       });
       const j = await res.json();
       if (!res.ok) {
@@ -94,11 +95,6 @@ export default function AccountProfilePage() {
   }
 
   if (!user) return null;
-
-  const pinnedOrTopBadges =
-    user.badges.filter((b) => b.pinned).length > 0
-      ? user.badges.filter((b) => b.pinned)
-      : user.badges.slice(0, 4);
 
   const isDiscordLinked =
     Boolean(user.discordId) || user.linkedProviders.includes("discord");
@@ -162,30 +158,17 @@ export default function AccountProfilePage() {
             </div>
           </div>
 
-          {/* Name, Pinned Badges & Email — cleanly below cover banner */}
+          {/* Name, Admin/Head Verified Check & Email — cleanly below cover banner */}
           <div className="mt-3.5 min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
               <h2 className="break-words text-xl font-extrabold text-white sm:text-2xl">
                 {name || user.name}
               </h2>
-              {pinnedOrTopBadges.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {pinnedOrTopBadges.map((b) => (
-                    <span
-                      key={b.slug}
-                      title={`${b.name}: ${b.description}`}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-xl border"
-                      style={{
-                        backgroundColor: `${b.color}20`,
-                        borderColor: `${b.color}55`,
-                        color: b.color,
-                      }}
-                    >
-                      <BadgeIcon name={b.icon} className="h-3.5 w-3.5" />
-                    </span>
-                  ))}
-                </div>
-              )}
+              <VerifiedBadge
+                verification={user.verification}
+                accountName={name || user.name}
+                size="md"
+              />
             </div>
             <p className="mt-1 truncate text-xs text-slate-400">
               {user.username ? `@${user.username} · ` : ""}
@@ -290,7 +273,10 @@ export default function AccountProfilePage() {
               </div>
             </Link>
 
-            <div className="min-w-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5">
+            <Link
+              href="/account/badges"
+              className="min-w-0 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70 p-3.5 transition hover:border-indigo-500/60"
+            >
               <div className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 Badges Earned
               </div>
@@ -300,10 +286,10 @@ export default function AccountProfilePage() {
                   {user.badges.length}
                 </span>
                 <span className="text-xs font-medium text-slate-500">
-                  / {user.allBadges.length}
+                  / {user.allBadges.length} →
                 </span>
               </div>
-            </div>
+            </Link>
 
             <Link
               href="/account/apps"
@@ -465,16 +451,6 @@ export default function AccountProfilePage() {
         )}
       </section>
 
-      {/* GitHub/Discord-Style Badges Showcase */}
-      {SITE_SETTINGS.features.enableBadges && user.allBadges.length > 0 && (
-        <BadgeShowcase
-          allBadges={user.allBadges}
-          onPinnedChange={async () => {
-            await refreshUser();
-          }}
-        />
-      )}
-
       {error && (
         <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-3.5 text-xs text-rose-300">
           {error}
@@ -557,7 +533,7 @@ export default function AccountProfilePage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 sm:grid-cols-3">
           <label className="flex cursor-pointer items-start gap-2.5 text-xs text-slate-300">
             <input
               type="checkbox"
@@ -567,7 +543,7 @@ export default function AccountProfilePage() {
             />
             <span>
               <strong className="block text-white">Public Profile Page</strong>
-              Allow anyone to view your badges &amp; roles at{" "}
+              Allow anyone to view your profile at{" "}
               <code className="text-indigo-300">/u/{username || "username"}</code>.
             </span>
           </label>
@@ -582,6 +558,19 @@ export default function AccountProfilePage() {
             <span>
               <strong className="block text-white">Show Linked Socials</strong>
               Display your Discord handle &amp; GitHub link on your public profile.
+            </span>
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-2.5 text-xs text-slate-300">
+            <input
+              type="checkbox"
+              checked={showPublicBadges}
+              onChange={(e) => setShowPublicBadges(e.target.checked)}
+              className="mt-0.5 h-4 w-4 accent-indigo-500"
+            />
+            <span>
+              <strong className="block text-white">Show Badges Tab</strong>
+              Display your GitHub-style Achievements &amp; Highlights publicly.
             </span>
           </label>
         </div>

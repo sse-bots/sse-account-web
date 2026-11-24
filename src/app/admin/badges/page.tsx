@@ -1,20 +1,36 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Award, Check, Lock, Plus, Trash2, X } from "lucide-react";
+import {
+  Award,
+  Check,
+  Edit3,
+  Image as ImageIcon,
+  Lock,
+  Plus,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react";
+import { BadgeArtwork } from "@/components/BadgeArtwork";
 import { BadgeIcon } from "@/components/BadgeIcon";
 import { SITE_SETTINGS } from "@/lib/site-settings";
+import type { BadgeCategory, BadgeRarity } from "@/lib/badges";
 
 interface BadgeRow {
   id: string;
   slug: string;
   name: string;
   description: string;
+  howToEarn: string;
   icon: string;
+  imageUrl: string | null;
   color: string;
-  rarity: "common" | "rare" | "epic" | "legendary" | "staff";
+  rarity: BadgeRarity;
+  category: BadgeCategory;
   isAuto: boolean;
   isSystem: boolean;
+  isLegacy: boolean;
 }
 
 const SWATCHES = [
@@ -30,7 +46,13 @@ const SWATCHES = [
   "#f97316",
 ];
 
-const RARITIES = ["common", "rare", "epic", "legendary", "staff"] as const;
+const RARITIES: BadgeRarity[] = [
+  "common",
+  "rare",
+  "epic",
+  "legendary",
+  "staff",
+];
 
 function slugify(v: string) {
   return v
@@ -48,13 +70,18 @@ export default function AdminBadgesPage() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  const [showCreate, setShowCreate] = useState(false);
+  const [studioOpen, setStudioOpen] = useState(false);
+  const [editingSlug, setEditingSlug] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [slug, setSlug] = useState("");
   const [description, setDescription] = useState("");
+  const [howToEarn, setHowToEarn] = useState("");
   const [icon, setIcon] = useState("trophy");
+  const [imageUrl, setImageUrl] = useState("");
   const [color, setColor] = useState("#f59e0b");
-  const [rarity, setRarity] = useState<BadgeRow["rarity"]>("epic");
+  const [rarity, setRarity] = useState<BadgeRarity>("epic");
+  const [category, setCategory] = useState<BadgeCategory>("achievement");
+  const [isLegacy, setIsLegacy] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -81,34 +108,72 @@ export default function AdminBadgesPage() {
     load();
   }, [load]);
 
-  async function handleCreate(e: React.FormEvent) {
+  function openCreate() {
+    setEditingSlug(null);
+    setName("");
+    setSlug("");
+    setDescription("");
+    setHowToEarn("");
+    setIcon("trophy");
+    setImageUrl("");
+    setColor("#f59e0b");
+    setRarity("epic");
+    setCategory("achievement");
+    setIsLegacy(false);
+    setStudioOpen(true);
+  }
+
+  function openEdit(b: BadgeRow) {
+    setEditingSlug(b.slug);
+    setName(b.name);
+    setSlug(b.slug);
+    setDescription(b.description);
+    setHowToEarn(b.howToEarn || "");
+    setIcon(b.icon);
+    setImageUrl(b.imageUrl || "");
+    setColor(b.color);
+    setRarity(b.rarity);
+    setCategory(b.category);
+    setIsLegacy(Boolean(b.isLegacy));
+    setStudioOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
     try {
+      const isEditing = Boolean(editingSlug);
       const res = await fetch("/api/admin/badges", {
-        method: "POST",
+        method: isEditing ? "PATCH" : "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name,
-          slug: slug || slugify(name),
+          slug: isEditing ? editingSlug : slug || slugify(name),
           description,
+          howToEarn,
           icon,
+          imageUrl: imageUrl.trim(),
           color,
           rarity,
+          category,
+          isLegacy,
         }),
       });
       const j = await res.json();
       if (!res.ok) {
-        setError(j.error || "Could not create badge.");
+        setError(j.error || "Could not save badge.");
         return;
       }
-      setName("");
-      setSlug("");
-      setDescription("");
-      setShowCreate(false);
-      setToast(`Badge "${j.slug}" created! Assign it to users on Registered Users.`);
+      setStudioOpen(false);
+      setEditingSlug(null);
+      setToast(
+        isEditing
+          ? `Updated badge "${name}".`
+          : `Badge "${j.slug}" published! Assign it on Registered Users.`
+      );
       window.setTimeout(() => setToast(null), 4000);
       await load();
     } finally {
@@ -137,20 +202,19 @@ export default function AdminBadgesPage() {
             {SITE_SETTINGS.brandPrefix} Badges Studio
           </h1>
           <p className="mt-1 text-xs text-slate-400">
-            Design GitHub &amp; Discord-style achievement badges. Auto badges
-            unlock automatically; custom badges can be awarded to any user on{" "}
-            <strong>Registered Users</strong> and sync across SSE sites via{" "}
-            <code>sse_badges</code>.
+            Design GitHub-style circular achievement medallions &amp; Highlights
+            badges. Supports animated PNG/GIF artwork URLs and syncs across SSE
+            sites via <code>sse_badges</code>.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => setShowCreate((v) => !v)}
+          onClick={() => (studioOpen ? setStudioOpen(false) : openCreate())}
           className="inline-flex items-center gap-2 self-start rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-semibold text-white hover:bg-indigo-500 sm:self-center"
         >
-          {showCreate ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-          {showCreate ? "Close Studio" : "Create Custom Badge"}
+          {studioOpen ? <X className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+          {studioOpen ? "Close Studio" : "Create Custom Badge"}
         </button>
       </div>
 
@@ -166,27 +230,24 @@ export default function AdminBadgesPage() {
         </div>
       )}
 
-      {showCreate && (
+      {studioOpen && (
         <form
-          onSubmit={handleCreate}
+          onSubmit={handleSubmit}
           className="space-y-5 rounded-3xl border border-indigo-500/40 bg-slate-900/70 p-4 sm:p-6"
         >
-          {/* Live Badge Card Preview */}
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-            <div className="flex items-center gap-3">
-              <div
-                className="flex h-12 w-12 items-center justify-center rounded-2xl border"
-                style={{
-                  backgroundColor: `${color}22`,
-                  borderColor: `${color}66`,
-                  color,
-                  boxShadow: `0 0 22px ${color}35`,
-                }}
-              >
-                <BadgeIcon name={icon} className="h-6 w-6" />
-              </div>
+            <div className="flex items-center gap-4">
+              <BadgeArtwork
+                slug={slug || "preview"}
+                name={name.trim() || "Badge Preview"}
+                icon={icon}
+                color={color}
+                imageUrl={imageUrl.trim() || null}
+                tier={1}
+                size="md"
+              />
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-sm font-bold text-white">
                     {name.trim() || "Badge Preview"}
                   </span>
@@ -196,15 +257,23 @@ export default function AdminBadgesPage() {
                   >
                     {rarity}
                   </span>
+                  <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[9px] font-bold uppercase text-slate-300">
+                    {category}
+                  </span>
+                  {isLegacy && (
+                    <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[9px] font-bold uppercase text-amber-300">
+                      Legacy
+                    </span>
+                  )}
                 </div>
-                <p className="mt-0.5 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-slate-400">
                   {description.trim() || "Custom achievement badge description"}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-300">
                 Badge Name *
@@ -216,9 +285,9 @@ export default function AdminBadgesPage() {
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value);
-                  setSlug(slugify(e.target.value));
+                  if (!editingSlug) setSlug(slugify(e.target.value));
                 }}
-                placeholder="e.g. Tournament Champion, Bug Hunter"
+                placeholder="e.g. Arena Champion"
                 className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-white"
               />
             </div>
@@ -229,11 +298,26 @@ export default function AdminBadgesPage() {
               </label>
               <input
                 required
+                disabled={Boolean(editingSlug)}
                 value={slug}
                 onChange={(e) => setSlug(slugify(e.target.value))}
-                placeholder="tournament_champion"
-                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 font-mono text-xs text-white"
+                placeholder="arena_champion"
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 font-mono text-xs text-white disabled:opacity-60"
               />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-300">
+                Category
+              </label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value as BadgeCategory)}
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-white"
+              >
+                <option value="achievement">Achievement (Circular Medallion)</option>
+                <option value="highlight">Highlight (Sidebar List Badge)</option>
+              </select>
             </div>
 
             <div>
@@ -242,9 +326,7 @@ export default function AdminBadgesPage() {
               </label>
               <select
                 value={rarity}
-                onChange={(e) =>
-                  setRarity(e.target.value as BadgeRow["rarity"])
-                }
+                onChange={(e) => setRarity(e.target.value as BadgeRarity)}
                 className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs capitalize text-white"
               >
                 {RARITIES.map((r) => (
@@ -256,23 +338,68 @@ export default function AdminBadgesPage() {
             </div>
           </div>
 
-          <div>
-            <label className="mb-1 block text-xs font-medium text-slate-300">
-              Description
-            </label>
-            <input
-              maxLength={180}
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Explain how a member earns this badge..."
-              className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-white"
-            />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-300">
+                Description
+              </label>
+              <input
+                maxLength={180}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Short summary shown in the badge card..."
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-white"
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-300">
+                How to Earn
+              </label>
+              <input
+                maxLength={200}
+                value={howToEarn}
+                onChange={(e) => setHowToEarn(e.target.value)}
+                placeholder="Explain how a member unlocks this badge..."
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-white"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-300">
+                <ImageIcon className="h-3.5 w-3.5 text-indigo-400" />
+                Custom Artwork URL (Optional PNG / GIF / WebP)
+              </label>
+              <input
+                value={imageUrl}
+                onChange={(e) => setImageUrl(e.target.value)}
+                placeholder="https://... (leave empty for built-in GitHub vector medallion)"
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-3.5 py-2 text-xs text-white"
+              />
+            </div>
+
+            <div className="flex items-end pb-1">
+              <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-slate-800 bg-slate-950/70 px-3.5 py-2.5 text-xs text-slate-300">
+                <input
+                  type="checkbox"
+                  checked={isLegacy}
+                  onChange={(e) => setIsLegacy(e.target.checked)}
+                  className="h-4 w-4 accent-indigo-500"
+                />
+                <span>
+                  Mark as <strong className="text-white">Legacy / Limited</strong>{" "}
+                  badge
+                </span>
+              </label>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-300">
-                Choose Icon
+                Medallion Emblem
               </label>
               <div className="grid grid-cols-4 gap-2 min-[360px]:grid-cols-6 sm:grid-cols-8">
                 {icons.map((ic) => (
@@ -295,7 +422,7 @@ export default function AdminBadgesPage() {
 
             <div>
               <label className="mb-1.5 block text-xs font-medium text-slate-300">
-                Badge Color
+                Accent Color
               </label>
               <div className="flex flex-wrap items-center gap-2">
                 {SWATCHES.map((sw) => (
@@ -322,13 +449,26 @@ export default function AdminBadgesPage() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={saving}
-            className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
-          >
-            {saving ? "Creating..." : "Publish Badge"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={saving}
+              className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-500 disabled:opacity-50"
+            >
+              {saving
+                ? "Saving..."
+                : editingSlug
+                  ? "Save Badge Changes"
+                  : "Publish Badge"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setStudioOpen(false)}
+              className="rounded-xl border border-slate-700 bg-slate-800 px-4 py-2.5 text-xs font-semibold text-slate-200"
+            >
+              Cancel
+            </button>
+          </div>
         </form>
       )}
 
@@ -341,19 +481,31 @@ export default function AdminBadgesPage() {
           {badges.map((b) => (
             <div
               key={b.slug}
-              className="flex flex-col justify-between rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
+              className="group flex flex-col justify-between rounded-2xl border border-slate-800 bg-slate-900/60 p-4"
             >
-              <div className="flex items-start gap-3">
-                <div
-                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border"
-                  style={{
-                    backgroundColor: `${b.color}20`,
-                    borderColor: `${b.color}55`,
-                    color: b.color,
-                  }}
-                >
-                  <BadgeIcon name={b.icon} className="h-5 w-5" />
-                </div>
+              <div className="flex items-start gap-3.5">
+                {b.category === "highlight" ? (
+                  <div
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border"
+                    style={{
+                      backgroundColor: `${b.color}20`,
+                      borderColor: `${b.color}55`,
+                      color: b.color,
+                    }}
+                  >
+                    <BadgeIcon name={b.icon} className="h-5 w-5" />
+                  </div>
+                ) : (
+                  <BadgeArtwork
+                    slug={b.slug}
+                    name={b.name}
+                    icon={b.icon}
+                    color={b.color}
+                    imageUrl={b.imageUrl}
+                    size="sm"
+                  />
+                )}
+
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-1.5">
                     <span className="truncate text-sm font-bold text-white">
@@ -366,38 +518,55 @@ export default function AdminBadgesPage() {
                       {b.rarity}
                     </span>
                   </div>
-                  <div className="font-mono text-[10px] text-slate-500">
-                    {b.slug}
+                  <div className="flex items-center gap-1.5 font-mono text-[10px] text-slate-500">
+                    <span>{b.slug}</span>
+                    <span>·</span>
+                    <span className="capitalize">{b.category}</span>
                   </div>
                   <p className="mt-1 text-xs text-slate-400">{b.description}</p>
                 </div>
               </div>
 
-              <div className="mt-3 flex items-center justify-between border-t border-slate-800/80 pt-3">
+              <div className="mt-3 flex items-center justify-between gap-2 border-t border-slate-800/80 pt-3">
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400">
                   {b.isAuto ? (
                     <>
                       <Lock className="h-3 w-3" />
-                      Auto-Unlocked Achievement
+                      Auto-Unlocked
+                    </>
+                  ) : b.category === "highlight" ? (
+                    <>
+                      <Sparkles className="h-3 w-3 text-amber-400" />
+                      Highlight Badge
                     </>
                   ) : (
                     <>
                       <Award className="h-3 w-3 text-indigo-400" />
-                      Admin-Awarded Custom
+                      {b.isSystem ? "Built-In Award" : "Custom Award"}
                     </>
                   )}
                 </span>
 
-                {!b.isSystem && (
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => handleDelete(b)}
-                    className="inline-flex items-center gap-1 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/20"
+                    onClick={() => openEdit(b)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-[11px] font-semibold text-slate-200 hover:border-indigo-500 hover:text-white"
                   >
-                    <Trash2 className="h-3 w-3" />
-                    Delete
+                    <Edit3 className="h-3 w-3" />
+                    Edit
                   </button>
-                )}
+                  {!b.isSystem && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(b)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[11px] font-semibold text-rose-300 hover:bg-rose-500/20"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Delete
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))}
