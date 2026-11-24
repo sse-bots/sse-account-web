@@ -289,7 +289,7 @@ export default function AdminRolesPage() {
       {showCreate && (
         <form
           onSubmit={handleCreate}
-          className="space-y-4 rounded-3xl border border-indigo-500/40 bg-slate-900/70 p-6"
+          className="space-y-4 rounded-3xl border border-indigo-500/40 bg-slate-900/70 p-4 sm:p-6"
         >
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-base font-bold text-white">
@@ -617,7 +617,7 @@ export default function AdminRolesPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
           <form
             onSubmit={handleSaveEdit}
-            className="max-h-[90vh] w-full max-w-xl space-y-4 overflow-y-auto rounded-3xl border border-slate-700 bg-[#0b1120] p-6 shadow-2xl"
+            className="max-h-[90dvh] w-full max-w-xl space-y-4 overflow-y-auto rounded-3xl border border-slate-700 bg-[#0b1120] p-5 shadow-2xl sm:p-6"
           >
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-white">

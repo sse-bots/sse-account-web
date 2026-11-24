@@ -112,11 +112,19 @@ export function ThemeCustomizer({
       </button>
 
       {open && (
-        <div
-          className={`animate-sheet-up absolute top-11 z-50 w-72 overflow-hidden rounded-2xl border border-slate-700/90 bg-[#0b1120] shadow-2xl ${
-            align === "right" ? "right-0" : "left-0"
-          }`}
-        >
+        <>
+          <div
+            className="fixed inset-0 z-40 bg-black/35 lg:hidden"
+            onClick={() => {
+              setOpen(false);
+              setSubmenu(null);
+            }}
+          />
+          <div
+            className={`animate-sheet-up fixed right-3 top-[calc(var(--sse-header-height)+0.5rem)] z-50 max-h-[75dvh] w-[min(18.5rem,calc(100vw-1.5rem))] overflow-y-auto rounded-2xl border border-slate-700/90 bg-[#0b1120] shadow-2xl lg:absolute lg:top-11 lg:w-72 ${
+              align === "right" ? "lg:right-0 lg:left-auto" : "lg:left-0 lg:right-auto"
+            }`}
+          >
           {/* 1. Theme Preset Row (Default / Mono / Cobalt / Sky / Mint / Iris / Crimson / Coral / Sunset / Carbon / Bubblegum / Parchment) */}
           <div className="border-b border-slate-800/90 p-1.5">
             <button
@@ -474,7 +482,8 @@ export function ThemeCustomizer({
               <RotateCcw className="h-3.5 w-3.5 text-slate-400" />
             </button>
           </div>
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

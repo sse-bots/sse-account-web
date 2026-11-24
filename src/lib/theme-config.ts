@@ -323,6 +323,17 @@ export function applyThemeToDocument(state: ThemeState): void {
   root.style.setProperty("--app-font", fontObj.family);
   root.style.setProperty("--app-radius", state.radius);
 
+  // Keep Android Capacitor WebView & mobile browser status bar synced to surface colour
+  let metaTheme = document.querySelector<HTMLMetaElement>(
+    'meta[name="theme-color"]'
+  );
+  if (!metaTheme) {
+    metaTheme = document.createElement("meta");
+    metaTheme.name = "theme-color";
+    document.head.appendChild(metaTheme);
+  }
+  metaTheme.content = surface.bg;
+
   const linkId = `sse-gfont-${fontObj.id}`;
   if (!document.getElementById(linkId)) {
     const link = document.createElement("link");

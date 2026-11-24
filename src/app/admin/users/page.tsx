@@ -207,8 +207,107 @@ export default function AdminUsersPage() {
           No matching accounts found.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-slate-800">
-          <table className="w-full text-left text-xs">
+        <>
+          {/* Mobile Card Layout (crisp inside Android APK & narrow phones) */}
+          <div className="space-y-3 md:hidden">
+            {rows.map((u) => (
+              <div
+                key={u.id}
+                className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-xs"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 font-bold text-white">
+                      <span className="truncate">{u.name}</span>
+                      {u.twoFactorEnabled && (
+                        <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
+                      )}
+                    </div>
+                    <div className="break-all text-[11px] text-slate-400">
+                      {u.email}
+                    </div>
+                    {u.username && (
+                      <Link
+                        href={`/u/${u.username}`}
+                        className="mt-0.5 inline-block font-mono text-[11px] text-indigo-400 hover:underline"
+                      >
+                        /u/{u.username}
+                      </Link>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {u.roleDetails.map((r) => (
+                    <span
+                      key={r.slug}
+                      className="rounded-full px-2 py-0.5 text-[10px] font-bold"
+                      style={{
+                        backgroundColor: `${r.color}22`,
+                        color: r.color,
+                        border: `1px solid ${r.color}55`,
+                      }}
+                    >
+                      {r.name}
+                    </span>
+                  ))}
+                  {u.badges.slice(0, 5).map((b) => (
+                    <span
+                      key={b.slug}
+                      title={b.name}
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-md border"
+                      style={{
+                        backgroundColor: `${b.color}20`,
+                        borderColor: `${b.color}55`,
+                        color: b.color,
+                      }}
+                    >
+                      <BadgeIcon name={b.icon} className="h-3 w-3" />
+                    </span>
+                  ))}
+                </div>
+
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-2.5">
+                  <div className="min-w-0 font-mono text-[10px] text-slate-400">
+                    <div>
+                      DC:{" "}
+                      {u.discordUsername
+                        ? `@${u.discordUsername}`
+                        : u.discordId || "—"}
+                    </div>
+                    <div>
+                      GH:{" "}
+                      {u.githubUsername
+                        ? `@${u.githubUsername}`
+                        : u.githubId || "—"}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => openEditor(u, "roles")}
+                      className="inline-flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-white"
+                    >
+                      <Tag className="h-3 w-3" />
+                      Roles
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openEditor(u, "badges")}
+                      className="inline-flex items-center gap-1 rounded-xl border border-slate-700 bg-slate-800 px-3 py-1.5 text-[11px] font-semibold text-white"
+                    >
+                      <Award className="h-3 w-3 text-amber-400" />
+                      Badges
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Table */}
+          <div className="hidden overflow-x-auto rounded-2xl border border-slate-800 md:block">
+            <table className="w-full text-left text-xs">
             <thead className="bg-slate-900 text-slate-400">
               <tr>
                 <th className="px-4 py-2.5">User</th>
@@ -313,13 +412,14 @@ export default function AdminUsersPage() {
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
 
       {/* Unified Roles & Badges Modal */}
       {editingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md space-y-4 rounded-3xl border border-slate-700 bg-[#0b1120] p-6 shadow-2xl">
+          <div className="max-h-[90dvh] w-full max-w-md space-y-4 overflow-y-auto rounded-3xl border border-slate-700 bg-[#0b1120] p-5 shadow-2xl sm:p-6">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-white">

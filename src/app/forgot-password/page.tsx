@@ -63,8 +63,8 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="mx-auto mt-10 max-w-md">
-      <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-7 shadow-2xl sm:p-8">
+    <div className="mx-auto mt-3 max-w-md sm:mt-10">
+      <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 shadow-2xl sm:p-8">
         <div className="mb-6 flex flex-col items-center text-center">
           <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/15 text-indigo-400">
             <KeyRound className="h-7 w-7" />

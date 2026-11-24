@@ -326,7 +326,7 @@ export default function AccountProfilePage() {
       </section>
 
       {/* Dedicated Connections Section (Fixes missing connections on /account!) */}
-      <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6">
+      <section className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
             <div className="flex items-center gap-2">
@@ -484,7 +484,7 @@ export default function AccountProfilePage() {
       {/* Personal Information Form */}
       <form
         onSubmit={handleSave}
-        className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-6"
+        className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/60 p-4 sm:p-6"
       >
         <h3 className="text-base font-bold text-white">Personal Information</h3>
 

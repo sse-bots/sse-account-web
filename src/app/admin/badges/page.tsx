@@ -169,7 +169,7 @@ export default function AdminBadgesPage() {
       {showCreate && (
         <form
           onSubmit={handleCreate}
-          className="space-y-5 rounded-3xl border border-indigo-500/40 bg-slate-900/70 p-6"
+          className="space-y-5 rounded-3xl border border-indigo-500/40 bg-slate-900/70 p-4 sm:p-6"
         >
           {/* Live Badge Card Preview */}
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
@@ -274,7 +274,7 @@ export default function AdminBadgesPage() {
               <label className="mb-1.5 block text-xs font-medium text-slate-300">
                 Choose Icon
               </label>
-              <div className="grid grid-cols-8 gap-2">
+              <div className="grid grid-cols-4 gap-2 min-[360px]:grid-cols-6 sm:grid-cols-8">
                 {icons.map((ic) => (
                   <button
                     key={ic}
