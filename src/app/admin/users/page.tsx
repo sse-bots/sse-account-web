@@ -18,10 +18,9 @@ import { VerifiedBadge } from "@/components/VerifiedBadge";
 import {
   VERIFICATION_KINDS,
   type AccountVerification,
-  type BadgeCategory,
-  type BadgeTier,
   type VerificationKind,
-} from "@/lib/badges";
+} from "@/lib/badge-constants";
+import type { BadgeCategory, BadgeTier } from "@/lib/badges";
 import { SITE_SETTINGS } from "@/lib/site-settings";
 
 interface RoleBadge {
