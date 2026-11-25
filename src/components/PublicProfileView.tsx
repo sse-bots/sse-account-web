@@ -188,7 +188,13 @@ export function PublicProfileView({
           >
             <Award className="h-3.5 w-3.5" />
             Badges &amp; Achievements
-            <span className="rounded-full bg-slate-950/40 px-2 py-0.5 text-[10px]">
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] ${
+                activeTab === "badges"
+                  ? "bg-black/20"
+                  : "bg-slate-800 text-slate-300"
+              }`}
+            >
               {profile.badges.length}
             </span>
           </button>

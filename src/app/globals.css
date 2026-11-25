@@ -58,46 +58,85 @@ html.light body {
 .bg-\[\#111520\]\/95 {
   background-color: var(--surface-sidebar) !important;
 }
+@media (min-width: 1024px) {
+  .lg\:bg-\[\#0a0d14\] {
+    background-color: var(--surface-sidebar) !important;
+  }
+  .lg\:border-slate-800\/80 {
+    border-color: var(--surface-border) !important;
+  }
+}
 .bg-slate-900,
+.bg-slate-900\/20,
 .bg-slate-900\/30,
+.bg-slate-900\/35,
 .bg-slate-900\/40,
 .bg-slate-900\/50,
 .bg-slate-900\/60,
+.bg-slate-900\/65,
 .bg-slate-900\/70,
+.bg-slate-900\/75,
 .bg-slate-900\/80,
-.bg-slate-900\/90 {
+.bg-slate-900\/85,
+.bg-slate-900\/90,
+.bg-slate-900\/95 {
   background-color: var(--surface-card) !important;
 }
 .bg-slate-950,
+.bg-slate-950\/20,
+.bg-slate-950\/30,
+.bg-slate-950\/35,
 .bg-slate-950\/40,
 .bg-slate-950\/50,
 .bg-slate-950\/60,
+.bg-slate-950\/65,
 .bg-slate-950\/70,
+.bg-slate-950\/75,
 .bg-slate-950\/80,
-.bg-slate-950\/90 {
+.bg-slate-950\/85,
+.bg-slate-950\/90,
+.bg-slate-950\/95 {
   background-color: var(--surface-input) !important;
 }
 .bg-slate-800,
+.bg-slate-800\/30,
+.bg-slate-800\/40,
+.bg-slate-800\/50,
+.bg-slate-800\/60,
 .bg-slate-800\/70,
+.bg-slate-800\/75,
 .bg-slate-800\/80,
 .bg-slate-800\/90,
 .bg-slate-700,
-.bg-slate-700\/80 {
+.bg-slate-700\/70,
+.bg-slate-700\/80,
+.bg-slate-700\/90 {
   background-color: var(--surface-muted) !important;
 }
 .border-slate-800,
+.border-slate-800\/50,
+.border-slate-800\/60,
+.border-slate-800\/70,
+.border-slate-800\/75,
 .border-slate-800\/80,
 .border-slate-800\/90,
 .border-slate-700,
+.border-slate-700\/60,
+.border-slate-700\/70,
 .border-slate-700\/80,
 .border-slate-700\/90,
 .border-slate-600 {
   border-color: var(--surface-border) !important;
 }
+.hover\:border-slate-700:hover,
+.hover\:border-slate-600:hover {
+  border-color: var(--surface-hover) !important;
+}
 .border-\[\#0c0f17\] {
   border-color: var(--surface-card) !important;
 }
-.divide-slate-800 > :not(:last-child) {
+.divide-slate-800 > :not(:last-child),
+.divide-slate-800\/80 > :not(:last-child) {
   border-color: var(--surface-border) !important;
 }
 
@@ -107,6 +146,7 @@ html.light body {
   background-color: var(--surface-card) !important;
 }
 .hover\:bg-slate-800:hover,
+.hover\:bg-slate-800\/50:hover,
 .hover\:bg-slate-800\/60:hover,
 .hover\:bg-slate-800\/70:hover,
 .hover\:bg-slate-800\/80:hover,
@@ -259,14 +299,16 @@ html.dark .bg-gradient-to-br.from-indigo-500.to-violet-600 * {
 
 html.light .bg-emerald-600,
 html.light .bg-emerald-600 *,
+html.light .bg-emerald-500,
+html.light .bg-emerald-500 *,
 html.light .bg-rose-600,
 html.light .bg-rose-600 *,
 html.light .bg-rose-600\/90,
 html.light .bg-rose-600\/90 *,
 html.light .bg-\[\#5865F2\],
 html.light .bg-\[\#5865F2\] *,
-html.light .bg-\[\#4752C4\],
-html.light .bg-\[\#4752C4\] * {
+html.light .hover\:bg-\[\#4752C4\]:hover,
+html.light .hover\:bg-\[\#4752C4\]:hover * {
   color: #ffffff !important;
 }
 
@@ -281,15 +323,27 @@ html.light .bg-\[\#4752C4\] * {
 .bg-indigo-600\/20 {
   background-color: var(--accent-soft) !important;
 }
+.hover\:bg-indigo-500\/25:hover {
+  background-color: var(--accent-hero-tint) !important;
+}
 .border-indigo-500,
 .border-indigo-500\/30,
+.border-indigo-500\/35,
 .border-indigo-500\/40,
+.border-indigo-500\/45,
 .border-indigo-500\/50,
 .border-indigo-500\/60,
+.focus\:border-indigo-500:focus,
 .hover\:border-indigo-500:hover,
 .hover\:border-indigo-500\/50:hover,
 .hover\:border-indigo-500\/60:hover {
   border-color: var(--accent-border) !important;
+}
+.accent-indigo-500 {
+  accent-color: var(--accent-600) !important;
+}
+.ring-indigo-400 {
+  --tw-ring-color: var(--accent-400) !important;
 }
 .border-t-indigo-400,
 .border-t-indigo-500 {
@@ -577,4 +631,9 @@ html.light .sse-mobile-header {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Crisp outer hairline on circular white-ringed GitHub medallions in Light Mode */
+html.light .sse-badge-medallion {
+  box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.14), 0 6px 16px -4px rgba(15, 23, 42, 0.18) !important;
 }
