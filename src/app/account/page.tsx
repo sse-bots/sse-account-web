@@ -160,16 +160,14 @@ export default function AccountProfilePage() {
 
           {/* Name, Admin/Head Verified Check & Email — cleanly below cover banner */}
           <div className="mt-3.5 min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <h2 className="break-words text-xl font-extrabold text-white sm:text-2xl">
-                {name || user.name}
-              </h2>
+            <h2 className="inline-flex max-w-full flex-wrap items-center gap-1.5 break-words text-xl font-extrabold leading-tight text-white sm:text-2xl">
+              <span>{name || user.name}</span>
               <VerifiedBadge
                 verification={user.verification}
                 accountName={name || user.name}
                 size="md"
               />
-            </div>
+            </h2>
             <p className="mt-1 truncate text-xs text-slate-400">
               {user.username ? `@${user.username} · ` : ""}
               {email || user.email}
