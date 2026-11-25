@@ -48,6 +48,7 @@ html.light body {
 }
 .bg-\[\#0a0d14\],
 .bg-\[\#0a0d14\]\/85,
+.bg-\[\#0a0d14\]\/90,
 .bg-\[\#0b0e16\],
 .bg-\[\#0b1120\],
 .bg-\[\#0c0f17\],
@@ -263,7 +264,9 @@ html.light .bg-rose-600 *,
 html.light .bg-rose-600\/90,
 html.light .bg-rose-600\/90 *,
 html.light .bg-\[\#5865F2\],
-html.light .bg-\[\#5865F2\] * {
+html.light .bg-\[\#5865F2\] *,
+html.light .bg-\[\#4752C4\],
+html.light .bg-\[\#4752C4\] * {
   color: #ffffff !important;
 }
 
@@ -507,6 +510,13 @@ textarea {
   padding-top: var(--sse-safe-top);
   padding-left: max(0.75rem, var(--sse-safe-left));
   padding-right: max(0.75rem, var(--sse-safe-right));
+  background-color: var(--surface-sidebar) !important;
+  border-bottom-color: var(--surface-border) !important;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+html.light .sse-mobile-header {
+  box-shadow: 0 1px 10px rgba(15, 23, 42, 0.06);
 }
 
 .sse-main-shell {

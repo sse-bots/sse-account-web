@@ -110,16 +110,14 @@ export function PublicProfileView({
           </div>
 
           <div className="mt-3.5 min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <h1 className="break-words text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
-                {profile.name}
-              </h1>
+            <h1 className="inline-flex max-w-full flex-wrap items-center gap-1.5 break-words text-2xl font-extrabold leading-tight tracking-tight text-white sm:text-3xl">
+              <span>{profile.name}</span>
               <VerifiedBadge
                 verification={profile.verification}
                 accountName={profile.name}
                 size="md"
               />
-            </div>
+            </h1>
 
             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-400">
               <span className="font-mono font-semibold text-indigo-400">
