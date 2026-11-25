@@ -226,8 +226,8 @@ export function BadgeShowcase({
                   onClick={() => setSelected(badge)}
                   className={`flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition ${
                     badge.earned
-                      ? "border-slate-800 bg-slate-950/75 hover:border-indigo-500/60"
-                      : "border-slate-800/60 bg-slate-950/35 opacity-55 hover:opacity-80"
+                      ? "border-slate-800 bg-slate-950/70 hover:border-indigo-500/60"
+                      : "border-slate-800/70 bg-slate-950/40 opacity-65 hover:opacity-85"
                   }`}
                 >
                   <div className="flex min-w-0 items-center gap-3">

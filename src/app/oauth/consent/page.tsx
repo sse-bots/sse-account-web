@@ -300,7 +300,7 @@ function ConsentInner() {
               Account:
             </p>
 
-            <ul className="divide-y divide-slate-800 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/65">
+            <ul className="divide-y divide-slate-800 overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/70">
               {scopes.map((scope) => {
                 const meta = SCOPE_META[scope];
                 const ScopeIcon = meta?.icon || CheckCircle2;

@@ -239,7 +239,7 @@ export function BadgeArtwork({
 
   return (
     <div
-      className={`relative inline-flex shrink-0 select-none items-center justify-center rounded-full shadow-lg transition-transform duration-200 group-hover:scale-105 ${SIZE_CLASSES[size]} ${
+      className={`sse-badge-medallion relative inline-flex shrink-0 select-none items-center justify-center rounded-full shadow-lg transition-transform duration-200 group-hover:scale-105 ${SIZE_CLASSES[size]} ${
         locked ? "opacity-45 grayscale" : ""
       } ${className}`}
       style={{
